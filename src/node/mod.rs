@@ -1,8 +1,7 @@
 use std::rc::Rc;
-use std::io::Result as IoResult;
-use std::{u8, u16, u32, u64, i8, i16, i32, i64};
-use bytes::BufMut;
-pub use self::kind::Kind;
+
+pub mod kind;
+pub use kind::Kind;
 
 pub struct Node {
     kind: Kind,
@@ -13,10 +12,11 @@ pub enum Payload {
     None,
     Text(String),
     Index(u64),
-    Children(Vector<Rc<Node>>)
+    Children(Vec<Rc<Node>>)
 }
 
 impl Node {
+    /// Creates a new node.
     pub fn new(kind: Kind, payload: Payload) -> Node {
         Node {
             kind,
@@ -24,14 +24,17 @@ impl Node {
         }
     }
 
+    /// Returns the payload of a node.
     pub fn payload(&self) -> &Payload {
         &self.payload
     }
 
+    /// Returns the kind of a node.
     pub fn kind(&self) -> Kind {
         self.kind
     }
 
+    /// Returns true if the payload of a node is text.
     pub fn has_text(&self) -> bool {
         match self.payload {
             Payload::Text(_) => true,
@@ -39,6 +42,7 @@ impl Node {
         }
     }
 
+    /// Returns true if the payload of a node is an index.
     pub fn has_index(&self) -> bool {
         match self.payload {
             Payload::Index(_) => true,
@@ -46,139 +50,96 @@ impl Node {
         }
     }
 
+    /// Returns the number of child nodes of a node.
     pub fn num_children(&self) -> usize {
         match &self.payload {
-            Payload::Children(c) => c.len,
+            Payload::Children(c) => c.len(),
             _ => 0,
         }
     }
 
+    /// Returns true if a node has child nodes.
     pub fn has_children(&self) -> bool {
         self.num_children() != 0
     }
 
-    pub fn get_child(&self, i: u32) -> Option<Rc<Node>>{
-        match &self.payload {
-            Payload::Children(c) => match c.get(i) {
-                Some(r) => r.clone(),
-                None => None,
-            },
-            _ => None,
+    /// Returns a reference to a child node at a given index or None in case node ether has no
+    /// children or the index is OOB.
+    pub fn get_child(&self, i: usize) -> Option<Rc<Node>> {
+        if let Payload::Children(v) = &self.payload {
+            v.get(i).and_then(|r| Some(r.clone()))
+        } else {
+            None
         }
     }
 }
 
-pub fn is_alias_node(node: Node) -> bool {
+pub fn is_alias_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_alias_node(node.get_child(0).unwrap()),
+        Kind::Type => is_alias_node(node.get_child(0).unwrap().as_ref()),
         Kind::TypeAlias => true,
         _ => false,
     }
 }
 
-pub fn is_class_node(node: Node) -> bool {
+pub fn is_class_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_class_node(node.get_child(0).unwrap()),
+        Kind::Type => is_class_node(node.get_child(0).unwrap().as_ref()),
         Kind::Class | Kind::BoundGenericClass => true,
         _ => false,
     }
 }
 
-pub fn is_enum_node(node: Node) -> bool {
+pub fn is_enum_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_enum_node(node.get_child(0).unwrap()),
+        Kind::Type => is_enum_node(node.get_child(0).unwrap().as_ref()),
         Kind::Enum | Kind::BoundGenericEnum => true,
         _ => false,
     }
 }
 
-pub fn is_protocol_node(node: Node) -> bool {
+pub fn is_protocol_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_protocol_node(node.get_child(0).unwrap()),
+        Kind::Type => is_protocol_node(node.get_child(0).unwrap().as_ref()),
         Kind::Protocol | Kind::ProtocolSymbolicReference => true,
         _ => false,
     }
 }
 
-pub fn is_struct_node(node: Node) -> bool {
+pub fn is_struct_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_struct_node(node.get_child(0).unwrap()),
+        Kind::Type => is_struct_node(node.get_child(0).unwrap().as_ref()),
         Kind::Structure | Kind::BoundGenericStructure => true,
         _ => false,
     }
 }
 
-pub trait AddressSpace {
-    fn read_bytes<T: BufMut>(&self, addr: usize, size: usize, buf: &mut T) -> IoResult<()>;
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+    use crate::node::*;
 
-    fn read_u8(&self, addr: usize) -> IoResult<u8> {
-        let mut b = [0u8];
+    #[test]
+    fn test_is_class_node_recurse() {
+        // create a class node
+        let node1 = Node::new(
+            Kind::BoundGenericClass,
+            Payload::Text("test".to_string())
+        );
+        // create a parent node of Type kind
+        let node2 = Node::new(Kind::Type, Payload::Children(
+            vec![Rc::new(node1)]
+        ));
 
-        self.read_bytes(addr, b.len(), &b)?;
-
-        u8::from_ne_bytes(b)
-    }
-
-    fn read_u16(&self, addr: usize) -> IoResult<u16> {
-        let mut b = [0u8; 2];
-
-        self.read_bytes(addr, b.len(), &b)?;
-
-        u16::from_ne_bytes(b)
-    }
-
-    fn read_u32(&self, addr: usize) -> IoResult<u32> {
-        let mut b = [0u8; 4];
-
-        self.read_bytes(addr, b.len(), &b)?;
-
-        u32::from_ne_bytes(b)
-    }
-
-    fn read_u64(&self, addr: usize) -> IoResult<u64> {
-        let mut b = [0u8; 8];
-
-        self.read_bytes(addr, b.len(), &b)?;
-
-        u64::from_ne_bytes(b)
-    }
-
-    fn read_i8(&self, addr: usize) -> IoResult<i8> {
-        let mut b = [0u8];
-
-        self.read_bytes(addr, b.len(), &b)?;
-
-        i8::from_ne_bytes(b)
-    }
-
-    fn read_i16(&self, addr: usize) -> IoResult<i16> {
-        let mut b = [0u8; 2];
-
-        self.read_bytes(addr, b.len(), &b)?;
-
-        i16::from_ne_bytes(b)
-    }
-
-    fn read_i32(&self, addr: usize) -> IoResult<i32> {
-        let mut b = [0u8; 4];
-
-        self.read_bytes(addr, b.len(), &b)?;
-
-        i32::from_ne_bytes(b)
-    }
-
-    fn read_i64(&self, addr: usize) -> IoResult<i64> {
-        let mut b = [0u8; 8];
-
-        self.read_bytes(addr, b.len(), &b)?;
-
-        i64::from_ne_bytes(b)
+        assert!(is_class_node(&node2));
+        assert!(!is_alias_node(&node2));
+        assert!(!is_struct_node(&node2));
+        assert!(!is_enum_node(&node2));
+        assert!(!is_protocol_node(&node2));
     }
 }
-
-
