@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::slice::Iter;
 
 pub mod kind;
 pub use kind::Kind;
@@ -13,6 +14,23 @@ pub enum Payload {
     Text(String),
     Index(u64),
     Children(Vec<Rc<Node>>)
+}
+
+pub struct NodeIterator<'a> {
+    inner_iter: Option<Iter<'a, Rc<Node>>>
+}
+
+impl<'a> Iterator for NodeIterator<'a> {
+    type Item = &'a Node;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // could'n write it in one line since we need a mutable iterator reference
+        if let Some(i) = &mut self.inner_iter {
+            i.next().and_then(|r| Some(r.as_ref()))
+        } else {
+            None
+        }
+    }
 }
 
 impl Node {
@@ -70,6 +88,15 @@ impl Node {
             v.get(i).and_then(|r| Some(r.clone()))
         } else {
             None
+        }
+    }
+
+    pub fn iter_children(&self) -> NodeIterator {
+        NodeIterator {
+            inner_iter: match &self.payload {
+                Payload::Children(v) => Some(v.iter()),
+                _ => None,
+            }
         }
     }
 }
