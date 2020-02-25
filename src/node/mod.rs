@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use std::slice::Iter;
 
 pub mod kind;
@@ -13,11 +12,11 @@ pub enum Payload {
     None,
     Text(String),
     Index(u64),
-    Children(Vec<Rc<Node>>)
+    Children(Vec<Node>)
 }
 
 pub struct NodeIterator<'a> {
-    inner_iter: Option<Iter<'a, Rc<Node>>>
+    inner_iter: Option<Iter<'a, Node>>
 }
 
 impl<'a> Iterator for NodeIterator<'a> {
@@ -26,7 +25,7 @@ impl<'a> Iterator for NodeIterator<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         // could'n write it in one line since we need a mutable iterator reference
         if let Some(i) = &mut self.inner_iter {
-            i.next().and_then(|r| Some(r.as_ref()))
+            i.next()
         } else {
             None
         }
@@ -54,9 +53,17 @@ impl Node {
 
     /// Returns true if the payload of a node is text.
     pub fn has_text(&self) -> bool {
-        match self.payload {
+        match &self.payload {
             Payload::Text(_) => true,
             _ => false,
+        }
+    }
+
+    /// Returns text if the payload type is Text, otherwise None.
+    pub fn get_text(&self) -> Option<&String> {
+        match &self.payload {
+            Payload::Text(s) => Some(s),
+            _ => None,
         }
     }
 
@@ -65,6 +72,14 @@ impl Node {
         match self.payload {
             Payload::Index(_) => true,
             _ => false,
+        }
+    }
+
+    /// Returns an index if the payload type is Index, otherwise None.
+    pub fn get_index(&self) -> Option<u64> {
+        match &self.payload {
+            Payload::Index(i) => Some(*i),
+            _ => None,
         }
     }
 
@@ -83,9 +98,9 @@ impl Node {
 
     /// Returns a reference to a child node at a given index or None in case node ether has no
     /// children or the index is OOB.
-    pub fn get_child(&self, i: usize) -> Option<Rc<Node>> {
+    pub fn get_child(&self, i: usize) -> Option<&Node> {
         if let Payload::Children(v) = &self.payload {
-            v.get(i).and_then(|r| Some(r.clone()))
+            v.get(i)
         } else {
             None
         }
@@ -160,7 +175,7 @@ mod tests {
         );
         // create a parent node of Type kind
         let node2 = Node::new(Kind::Type, Payload::Children(
-            vec![Rc::new(node1)]
+            vec![node1]
         ));
 
         assert!(is_class_node(&node2));
@@ -168,5 +183,40 @@ mod tests {
         assert!(!is_struct_node(&node2));
         assert!(!is_enum_node(&node2));
         assert!(!is_protocol_node(&node2));
+    }
+
+    #[test]
+    fn test_children_iter_wrong_payload() {
+        let node = Node::new(
+            Kind::BoundGenericClass, Payload::None
+        );
+        let mut iter = node.iter_children();
+
+        assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn test_children_iter_empty() {
+        let node = Node::new(
+            Kind::BoundGenericClass, Payload::None
+        );
+        let mut iter = node.iter_children();
+
+        assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn test_children_iter_one_child() {
+        let child = Node::new(
+            Kind::Class, Payload::None
+        );
+        let node = Node::new(
+            Kind::BoundGenericClass,
+            Payload::Children(vec![child])
+        );
+        let mut iter = node.iter_children();
+
+        assert!(iter.next().is_some());
+        assert!(iter.next().is_none());
     }
 }
