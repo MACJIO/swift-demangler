@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 bytes = "^0.5"
+punycode = "^0.4"
