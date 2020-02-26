@@ -51,12 +51,15 @@ impl Demangler<'_> {
         c
     }
 
-    fn next_if(&mut self, c: u8) -> bool {
-        if c != self.peek_char().unwrap() {
-            false
+    fn next_if(&mut self, c: u8) -> Optional<bool> {
+        if let Some(v) = self.peek_char() {
+            let eq = v == c;
+            if eq {
+                self.position += 1;
+            }
+            Some(eq)
         } else {
-            self.position = self.position + 1;
-            true
+            None
         }
     }
 
