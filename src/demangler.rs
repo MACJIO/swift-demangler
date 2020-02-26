@@ -1,5 +1,3 @@
-use std::slice::Iter;
-
 use super::node::{Node, Kind, Payload};
 
 pub enum ErrorKind {
@@ -16,10 +14,20 @@ pub struct Demangler<'a> {
     buffer: &'a [u8],
     position: usize,
     address: usize,
+    node_stack: Vec<Node>,
 }
 
 impl Demangler<'_> {
-    fn next_char(&mut self) -> Option<u8> {
+    pub fn new(buffer: &[u8], address: usize) -> Demangler {
+        Demangler {
+            buffer,
+            position: 0,
+            address,
+            node_stack: Vec::new()
+        }
+    }
+
+    pub fn next_char(&mut self) -> Option<u8> {
         let buffer = self.buffer;
         let position = self.position;
         if position < buffer.len() {
@@ -30,7 +38,7 @@ impl Demangler<'_> {
         }
     }
 
-    fn peek_char(&self) -> Option<u8> {
+    pub fn peek_char(&self) -> Option<u8> {
         let buffer = self.buffer;
         let position = self.position;
         if position < buffer.len() {
@@ -40,7 +48,7 @@ impl Demangler<'_> {
         }
     }
 
-    fn next_char_skip_padding(&mut self) -> Option<u8> {
+    pub fn next_char_skip_padding(&mut self) -> Option<u8> {
         let mut c = self.next_char();
         while match c {
             Some(v) => v == 0xff,
@@ -51,7 +59,7 @@ impl Demangler<'_> {
         c
     }
 
-    fn next_if(&mut self, c: u8) -> Optional<bool> {
+    pub fn next_if(&mut self, c: u8) -> Option<bool> {
         if let Some(v) = self.peek_char() {
             let eq = v == c;
             if eq {
@@ -63,31 +71,51 @@ impl Demangler<'_> {
         }
     }
 
+    /// Moves current position one character back.
+    ///
+    /// # Panics
+    /// In case current position is 0 this method will panic.
+    pub fn push_back(&mut self) {
+        // THIS IS AN EXPECTED PANIC
+        assert!(self.position > 0);
+        self.position -= 1;
+    }
+
     /// Checks if c is an ASCII digit.
-    fn is_digit(c: u8) -> bool {
+    pub fn is_digit(c: u8) -> bool {
         let c = c as char;
         ('0'..'9').contains(&c)
     }
 
     /// Checks if c is a lowercase ASCII letter.
-    fn is_lower_letter(c: u8) -> bool {
+    pub fn is_lower_letter(c: u8) -> bool {
         let c = c as char;
         ('a'..'z').contains(&c)
     }
 
     /// Checks if c is an uppercase ASCII letter.
-    fn is_upper_letter(c: u8) -> bool {
+    pub fn is_upper_letter(c: u8) -> bool {
         let c = c as char;
         ('A'..'Z').contains(&c)
     }
 
     /// Checks if c is an ASCII letter.
-    fn is_letter(c: u8) -> bool {
+    pub fn is_letter(c: u8) -> bool {
         let c = c as char;
         ('a'..'z').contains(&c) || ('A'..'Z').contains(&c)
     }
 
-    fn demangle_identifier(&mut self) -> Result<Node, Error> {
+    /// Pushes a node onto the node stack.
+    pub fn push_node(&mut self, node: Node) {
+        self.node_stack.push(node)
+    }
+
+    /// Pops a node from the node stack.
+    pub fn pop_node(&mut self) -> Option<Node> {
+        self.node_stack.pop()
+    }
+
+    pub fn demangle_identifier(&mut self) -> Result<Node, Error> {
         unimplemented!()
     }
 }
