@@ -119,7 +119,7 @@ impl Node {
 pub fn is_alias_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_alias_node(node.get_child(0).unwrap().as_ref()),
+        Kind::Type => is_alias_node(node.get_child(0).unwrap()),
         Kind::TypeAlias => true,
         _ => false,
     }
@@ -128,7 +128,7 @@ pub fn is_alias_node(node: &Node) -> bool {
 pub fn is_class_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_class_node(node.get_child(0).unwrap().as_ref()),
+        Kind::Type => is_class_node(node.get_child(0).unwrap()),
         Kind::Class | Kind::BoundGenericClass => true,
         _ => false,
     }
@@ -137,7 +137,7 @@ pub fn is_class_node(node: &Node) -> bool {
 pub fn is_enum_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_enum_node(node.get_child(0).unwrap().as_ref()),
+        Kind::Type => is_enum_node(node.get_child(0).unwrap()),
         Kind::Enum | Kind::BoundGenericEnum => true,
         _ => false,
     }
@@ -146,7 +146,7 @@ pub fn is_enum_node(node: &Node) -> bool {
 pub fn is_protocol_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_protocol_node(node.get_child(0).unwrap().as_ref()),
+        Kind::Type => is_protocol_node(node.get_child(0).unwrap()),
         Kind::Protocol | Kind::ProtocolSymbolicReference => true,
         _ => false,
     }
@@ -155,7 +155,7 @@ pub fn is_protocol_node(node: &Node) -> bool {
 pub fn is_struct_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_struct_node(node.get_child(0).unwrap().as_ref()),
+        Kind::Type => is_struct_node(node.get_child(0).unwrap()),
         Kind::Structure | Kind::BoundGenericStructure => true,
         _ => false,
     }

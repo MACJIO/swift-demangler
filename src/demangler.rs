@@ -18,7 +18,7 @@ pub struct Demangler<'a> {
     address: usize,
 }
 
-impl Demangler {
+impl Demangler<'_> {
     fn next_char(&mut self) -> Option<u8> {
         let buffer = self.buffer;
         let position = self.position;
@@ -49,6 +49,15 @@ impl Demangler {
             c = self.next_char()
         }
         c
+    }
+
+    fn next_if(&mut self, c: u8) -> bool {
+        if c != self.peek_char().unwrap() {
+            false
+        } else {
+            self.position = self.position + 1;
+            true
+        }
     }
 
     /// Checks if c is an ASCII digit.
