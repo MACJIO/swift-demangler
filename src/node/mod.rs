@@ -1,4 +1,5 @@
 use std::slice::Iter;
+use std::rc::Rc;
 
 pub mod kind;
 pub use kind::Kind;
@@ -12,15 +13,15 @@ pub enum Payload {
     None,
     Text(String),
     Index(u64),
-    Children(Vec<Node>)
+    Children(Vec<Rc<Node>>)
 }
 
 pub struct NodeIterator<'a> {
-    inner_iter: Option<Iter<'a, Node>>
+    inner_iter: Option<Iter<'a, Rc<Node>>>
 }
 
 impl<'a> Iterator for NodeIterator<'a> {
-    type Item = &'a Node;
+    type Item = &'a Rc<Node>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // could'n write it in one line since we need a mutable iterator reference
@@ -98,9 +99,9 @@ impl Node {
 
     /// Returns a reference to a child node at a given index or None in case node ether has no
     /// children or the index is OOB.
-    pub fn get_child(&self, i: usize) -> Option<&Node> {
+    pub fn get_child(&self, i: usize) -> Option<Rc<Node>> {
         if let Payload::Children(v) = &self.payload {
-            v.get(i)
+            v.get(i).and_then(|r| Some(r.clone()))
         } else {
             None
         }
@@ -119,7 +120,7 @@ impl Node {
 pub fn is_alias_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_alias_node(node.get_child(0).unwrap()),
+        Kind::Type => is_alias_node(node.get_child(0).unwrap().as_ref()),
         Kind::TypeAlias => true,
         _ => false,
     }
@@ -128,7 +129,7 @@ pub fn is_alias_node(node: &Node) -> bool {
 pub fn is_class_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_class_node(node.get_child(0).unwrap()),
+        Kind::Type => is_class_node(node.get_child(0).unwrap().as_ref()),
         Kind::Class | Kind::BoundGenericClass => true,
         _ => false,
     }
@@ -137,7 +138,7 @@ pub fn is_class_node(node: &Node) -> bool {
 pub fn is_enum_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_enum_node(node.get_child(0).unwrap()),
+        Kind::Type => is_enum_node(node.get_child(0).unwrap().as_ref()),
         Kind::Enum | Kind::BoundGenericEnum => true,
         _ => false,
     }
@@ -146,7 +147,7 @@ pub fn is_enum_node(node: &Node) -> bool {
 pub fn is_protocol_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_protocol_node(node.get_child(0).unwrap()),
+        Kind::Type => is_protocol_node(node.get_child(0).unwrap().as_ref()),
         Kind::Protocol | Kind::ProtocolSymbolicReference => true,
         _ => false,
     }
@@ -155,7 +156,7 @@ pub fn is_protocol_node(node: &Node) -> bool {
 pub fn is_struct_node(node: &Node) -> bool {
     match node.kind {
         // TODO: verify that user input can not cause a panic here
-        Kind::Type => is_struct_node(node.get_child(0).unwrap()),
+        Kind::Type => is_struct_node(node.get_child(0).unwrap().as_ref()),
         Kind::Structure | Kind::BoundGenericStructure => true,
         _ => false,
     }
@@ -164,14 +165,15 @@ pub fn is_struct_node(node: &Node) -> bool {
 #[cfg(test)]
 mod tests {
     use crate::node::*;
+    use std::rc::Rc;
 
     #[test]
     fn test_is_class_node_recurse() {
         // create a class node
-        let node1 = Node::new(
+        let node1 = Rc::new(Node::new(
             Kind::BoundGenericClass,
             Payload::Text("test".to_string())
-        );
+        ));
         // create a parent node of Type kind
         let node2 = Node::new(Kind::Type, Payload::Children(
             vec![node1]
@@ -206,9 +208,9 @@ mod tests {
 
     #[test]
     fn test_children_iter_one_child() {
-        let child = Node::new(
+        let child = Rc::new(Node::new(
             Kind::Class, Payload::None
-        );
+        ));
         let node = Node::new(
             Kind::BoundGenericClass,
             Payload::Children(vec![child])
