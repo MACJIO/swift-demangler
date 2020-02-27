@@ -13,6 +13,9 @@ pub enum ErrorKind {
     InvalidWordSubstIndex,
     InvalidOperator,
     IntegerOverflow,
+    InvalidIndexMangling,
+    UnexpectedNodeKind,
+    MissingNode,
 }
 
 pub struct Error {
@@ -119,15 +122,37 @@ impl Demangler<'_> {
     }
 
     /// Pops a node from the node stack if the last node has a specific kind.
-    pub fn pop_node_of_kind(&mut self, kind: Kind) -> Option<Rc<Node>> {
+    pub fn pop_node_of_kind(&mut self, kind: Kind) -> Result<Rc<Node>, Error> {
         if let Some(node) = self.node_stack.last() {
             if kind == node.kind() {
-                self.node_stack.pop()
+                Ok(self.node_stack.pop().unwrap())
             } else {
-                None
+                Err(Error::new(
+                    ErrorKind::UnexpectedNodeKind,
+                    format!("Unexpected node kind."),
+                    self.position)
+                )
             }
         } else {
-            None
+            Err(Error::new(
+                ErrorKind::MissingNode,
+                format!("Expected a node."),
+                self.position
+            ))
+        }
+    }
+
+    pub fn pop_type_and_get_child(&mut self) -> Result<Rc<Node>, Error> {
+        let ty = self.pop_node_of_kind(Kind::Type)?;
+
+        if let Some(child) = ty.get_child(0) {
+            Ok(child)
+        } else {
+            Err(Error::new(
+                ErrorKind::MissingNode,
+                "A Type node must have a child.".to_string(),
+                self.position
+            ))
         }
     }
 
@@ -182,6 +207,41 @@ impl Demangler<'_> {
             }
 
             break Ok(num)
+        }
+    }
+
+    /// Demangles an index.
+    /// TODO: proper docs
+    pub fn demangle_index(&mut self) -> Result<u32, Error> {
+        if let Some(b) = self.next_if('_' as u8) {
+            if b {
+                return Ok(0);
+            }
+
+            let num = self.demangle_natural()?;
+
+            if let Some(true) = self.next_if('_' as u8) {
+                let num = num.checked_add(1).ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::IntegerOverflow,
+                        format!("An integer overflow occurred while demangling an index."),
+                        self.position
+                    )
+                })?;
+                Ok(num + 1)
+            } else {
+                Err(Error::new(
+                    ErrorKind::InvalidIndexMangling,
+                    format!("Expected an underscore at the end of an index mangling."),
+                    self.position
+                ))
+            }
+        } else {
+            return Err(Error::new(
+                ErrorKind::UnexpectedEndOfName,
+                format!("Expected an index at position {}.", self.position),
+                self.position
+            ))
         }
     }
 
