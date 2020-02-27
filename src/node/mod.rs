@@ -163,7 +163,6 @@ pub fn is_struct_node(node: &Node) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
     use crate::node::*;
 
     #[test]

@@ -1,4 +1,4 @@
-use super::node::{Node, Kind, Payload};
+use super::node::{Node, Kind};
 
 pub enum ErrorKind {
     UnexpectedEndOfName,
