@@ -115,6 +115,19 @@ impl Demangler<'_> {
         self.node_stack.pop()
     }
 
+    /// Pops a node from the node stack if the last node has a specific kind.
+    pub fn pop_node_of_kind(&mut self, kind: Kind) -> Option<Node> {
+        if let Some(node) = self.node_stack.last() {
+            if kind == node.kind() {
+                self.node_stack.pop()
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
     pub fn demangle_identifier(&mut self) -> Result<Node, Error> {
         unimplemented!()
     }
