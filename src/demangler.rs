@@ -1,13 +1,26 @@
 use super::node::{Node, Kind};
 
+#[derive(Copy, Clone)]
 pub enum ErrorKind {
     UnexpectedEndOfName,
+    InvalidIdentifier,
     InvalidOperator(char),
 }
 
 pub struct Error {
     kind: ErrorKind,
+    message: String,
     position: usize,
+}
+
+impl Error {
+    pub fn new(kind: ErrorKind, message: String, position: usize) -> Error {
+        Error {
+            kind,
+            message,
+            position
+        }
+    }
 }
 
 pub struct Demangler<'a> {
@@ -128,6 +141,7 @@ impl Demangler<'_> {
         }
     }
 
+    /// Demangles an identifier at current position and returns an identifier node.
     pub fn demangle_identifier(&mut self) -> Result<Node, Error> {
         unimplemented!()
     }

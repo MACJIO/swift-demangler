@@ -1,6 +1,8 @@
 pub mod node;
 pub mod demangler;
 
+mod punycode;
+
 #[cfg(test)]
 mod tests {
     #[test]
