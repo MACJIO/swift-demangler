@@ -1,6 +1,9 @@
+use std::rc::Rc;
+
 use crate::node::{Node, Kind, Payload};
 use crate::punycode;
-use std::rc::Rc;
+use crate::util;
+use crate::util::is_word_start;
 
 #[derive(Copy, Clone)]
 pub enum ErrorKind {
@@ -105,30 +108,6 @@ impl Demangler<'_> {
         self.position -= 1;
     }
 
-    /// Checks if c is an ASCII digit.
-    pub fn is_digit(c: u8) -> bool {
-        let c = c as char;
-        ('0'..'9').contains(&c)
-    }
-
-    /// Checks if c is a lowercase ASCII letter.
-    pub fn is_lower_letter(c: u8) -> bool {
-        let c = c as char;
-        ('a'..'z').contains(&c)
-    }
-
-    /// Checks if c is an uppercase ASCII letter.
-    pub fn is_upper_letter(c: u8) -> bool {
-        let c = c as char;
-        ('A'..'Z').contains(&c)
-    }
-
-    /// Checks if c is an ASCII letter.
-    pub fn is_letter(c: u8) -> bool {
-        let c = c as char;
-        ('a'..'z').contains(&c) || ('A'..'Z').contains(&c)
-    }
-
     /// Pushes a node onto the node stack.
     pub fn push_node(&mut self, node: Node) {
         self.node_stack.push(Rc::new(node))
@@ -165,7 +144,7 @@ impl Demangler<'_> {
     }
 
     pub fn check_is_digit(&self, c: u8) -> Result<(), Error> {
-        if Demangler::is_digit(c) {
+        if util::is_digit(c as char) {
             Ok(())
         } else {
             Err(Error::new(
@@ -186,7 +165,7 @@ impl Demangler<'_> {
         let mut num = 0u32;
         loop {
             if let Some(c) = self.peek_char() {
-                if Demangler::is_digit(c) {
+                if util::is_digit(c as char) {
                     // An integer overflow will cause a panic, so better check for it.
                     num = num.checked_mul(10)
                         .and_then(|n| n.checked_add(c as u32))
@@ -217,10 +196,10 @@ impl Demangler<'_> {
         let c = self.next_char().unwrap();
         let mut has_word_subst = true;
 
-        let word_idx = if Demangler::is_lower_letter(c) {
+        let word_idx = if util::is_lower_letter(c as char) {
             c - 'a' as u8
         } else {
-            assert!(Demangler::is_upper_letter(c));
+            assert!(util::is_upper_letter(c as char));
             has_word_subst = false;
             c - 'A' as u8
         } as usize;
@@ -259,7 +238,7 @@ impl Demangler<'_> {
 
         let mut identifier = String::new();
         loop {
-            while has_word_subst && Demangler::is_letter(self.char_or_err(self.peek_char())?) {
+            while has_word_subst && util::is_letter(self.char_or_err(self.peek_char())? as char) {
                 let (part, has_more) = self.demangle_word_subst()?;
                 has_word_subst = has_more;
                 identifier += part;
@@ -305,8 +284,30 @@ impl Demangler<'_> {
                     ))
                 })?;
             } else {
-                // TODO: fill in the words vector
-                unimplemented!()
+                identifier += &string;
+
+                // Find all words in current part and add them to the word substitutions table.
+                let mut in_word = false;
+                let mut prev_char = '\x00';
+                let mut word = String::new(); // init word as an empty string
+                for c in string.chars() {
+                    if in_word {
+                        word.push(c);
+
+                        if util::is_word_end(c, prev_char) {
+                            if word.len() >= 2 && self.words.len() < Demangler::MAX_WORD_SUBSTS {
+                                self.words.push(word);
+                                word = String::new();
+                            }
+                            in_word = false;
+                        }
+                    } else if is_word_start(c) {
+                        in_word = true;
+                        word.push(c);
+                    }
+
+                    prev_char = c;
+                }
             }
 
             self.position += num_chars;
@@ -324,6 +325,7 @@ impl Demangler<'_> {
                 Payload::Text(identifier)
             ));
 
+            // add a substitution
             self.substitutions.push(node_ref.clone());
 
             Ok(node_ref)
