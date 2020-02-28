@@ -205,9 +205,9 @@ impl Demangler<'_> {
         let mut num = 0u32;
         loop {
             if let Some(c) = self.peek_char() {
-                self.position += 1;
-
                 if util::is_digit(c as char) {
+                    self.position += 1;
+
                     // An integer overflow will cause a panic, so better check for it.
                     num = num.checked_mul(10)
                         .and_then(|n| n.checked_add(c as u32 - '0' as u32))
@@ -314,10 +314,14 @@ impl Demangler<'_> {
 
         let mut identifier = String::new();
         loop {
-            while has_word_subst && util::is_letter(self.char_or_err(self.peek_char())? as char) {
-                let (part, has_more) = self.demangle_word_subst()?;
-                has_word_subst = has_more;
-                identifier += part;
+            while has_word_subst {
+                if util::is_letter(self.char_or_err(self.peek_char())? as char) {
+                    let (part, has_more) = self.demangle_word_subst()?;
+                    has_word_subst = has_more;
+                    identifier += part;
+                } else {
+                    break;
+                }
             }
 
             if let Some(true) = self.next_if('0' as u8) {
@@ -392,6 +396,10 @@ impl Demangler<'_> {
             }
 
             self.position += num_chars;
+
+            if !has_word_subst {
+                break;
+            }
         }
 
         if identifier.is_empty() {
@@ -427,6 +435,7 @@ impl Demangler<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::node::Payload;
 
     fn make_demangler(buffer: &[u8]) -> Demangler {
         Demangler::new(buffer, 0)
@@ -550,6 +559,11 @@ mod tests {
 
     #[test]
     fn test_demangle_natural() {
+        // check that demangle_number() doesn't advance after the number
+        let mut dem = make_demangler(b"123a");
+        assert_eq!(dem.demangle_natural().ok().unwrap(), 123);
+        assert!(dem.peek_char().is_some());
+
         let mut dem = make_demangler(b"123abc");
 
         assert_eq!(dem.demangle_natural().ok().unwrap(), 123);
@@ -603,5 +617,22 @@ mod tests {
     #[should_panic]
     fn test_demangle_word_subst_panic_on_eof() {
         make_demangler(b"").demangle_word_subst();
+    }
+
+    #[test]
+    fn test_demangle_identifier() {
+        let mut dem = make_demangler(b"1a");
+
+        let node = dem.demangle_identifier().unwrap_or_else(|e| {
+            panic!("{:?}", e);
+        });
+
+        assert_eq!(node.kind(), Kind::Identifier);
+
+        if let Payload::Text(t) = node.payload() {
+            assert_eq!(t, "a");
+        } else {
+            panic!("Invalid payload kind.")
+        }
     }
 }
