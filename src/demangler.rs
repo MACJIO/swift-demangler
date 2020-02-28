@@ -15,6 +15,7 @@ pub enum ErrorKind {
     InvalidIndexMangling,
     UnexpectedNodeKind,
     MissingNode,
+    MissingChildNode,
 }
 
 pub struct Error {
@@ -148,7 +149,7 @@ impl Demangler<'_> {
             Ok(child)
         } else {
             Err(Error::new(
-                ErrorKind::MissingNode,
+                ErrorKind::MissingChildNode,
                 "A Type node must have a child.".to_string(),
                 self.position
             ))
