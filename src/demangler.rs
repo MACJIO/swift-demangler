@@ -3,7 +3,6 @@ use std::rc::Rc;
 use crate::node::{Node, Kind, Payload};
 use crate::punycode;
 use crate::util;
-use crate::util::is_word_start;
 
 #[derive(Copy, Clone)]
 pub enum ErrorKind {
@@ -221,14 +220,13 @@ impl Demangler<'_> {
             let num = self.demangle_natural()?;
 
             if let Some(true) = self.next_if('_' as u8) {
-                let num = num.checked_add(1).ok_or_else(|| {
+                Ok(num.checked_add(1).ok_or_else(|| {
                     Error::new(
                         ErrorKind::IntegerOverflow,
                         format!("An integer overflow occurred while demangling an index."),
                         self.position
                     )
-                })?;
-                Ok(num + 1)
+                })?)
             } else {
                 Err(Error::new(
                     ErrorKind::InvalidIndexMangling,
@@ -361,12 +359,17 @@ impl Demangler<'_> {
                             }
                             in_word = false;
                         }
-                    } else if is_word_start(c) {
+                    } else if util::is_word_start(c) {
                         in_word = true;
                         word.push(c);
                     }
 
                     prev_char = c;
+                }
+
+                // handle the last word if any
+                if in_word && word.len() >= 2 && self.words.len() < Demangler::MAX_WORD_SUBSTS {
+                    self.words.push(word);
                 }
             }
 
