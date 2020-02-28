@@ -635,4 +635,27 @@ mod tests {
             panic!("Invalid payload kind.")
         }
     }
+
+    #[test]
+    fn test_demangle_identifier_with_word_substs() {
+        let mut dem = make_demangler(b"0abc3AAAdE2BB");
+
+        dem.add_word_subst("One".to_string());
+        dem.add_word_subst("Two".to_string());
+        dem.add_word_subst("Three".to_string());
+        dem.add_word_subst("Four".to_string());
+        dem.add_word_subst("Five".to_string());
+
+        let node = dem.demangle_identifier().unwrap_or_else(|e| {
+            panic!("{:?}", e);
+        });
+
+        assert_eq!(node.kind(), Kind::Identifier);
+
+        if let Payload::Text(t) = node.payload() {
+            assert_eq!(t, "OneTwoThreeAAAFourFiveBB");
+        } else {
+            panic!("Invalid payload kind.")
+        }
+    }
 }
