@@ -4,6 +4,8 @@ use crate::node::{kind, Node, Kind, Payload};
 use crate::punycode;
 use crate::util;
 
+const STDLIB_NAME: &str = "Swift";
+
 #[derive(Copy, Clone, Debug)]
 pub enum ErrorKind {
     UnexpectedEndOfName,
@@ -17,6 +19,7 @@ pub enum ErrorKind {
     UnexpectedNodeKind,
     MissingNode,
     MissingChildNode,
+    InvalidStandardSubst,
 }
 
 #[derive(Debug)]
@@ -34,6 +37,87 @@ impl Error {
             position
         }
     }
+}
+
+fn create_text_node(kind: Kind, text: String) -> Rc<Node> {
+    Rc::new(Node::new(kind, Payload::Text(text)))
+}
+
+fn create_node_with_children(kind: Kind, children: Vec<Rc<Node>>) -> Rc<Node> {
+    Rc::new(Node::new(kind, Payload::Children(children)))
+}
+
+fn create_type_node(inner_node: Rc<Node>) -> Rc<Node> {
+    create_node_with_children(Kind::Type, vec![inner_node])
+}
+
+fn create_swift_type(type_kind: Kind, name: String) -> Rc<Node> {
+    create_type_node(
+        create_node_with_children(
+            type_kind,
+            vec![
+                create_text_node(Kind::Module, STDLIB_NAME.to_string()),
+                create_text_node(Kind::Identifier, name)
+            ]
+        )
+    )
+}
+
+fn create_standard_substitution(c: char) -> Option<Rc<Node>> {
+    Some (match c {
+        'A' => create_swift_type(Kind::Structure, "AutoreleasingUnsafeMutablePointer".to_string()),
+        'a' => create_swift_type(Kind::Structure, "Array".to_string()),
+        'b' => create_swift_type(Kind::Structure, "Bool".to_string()),
+        'D' => create_swift_type(Kind::Structure, "Dictionary".to_string()),
+        'd' => create_swift_type(Kind::Structure, "Double".to_string()),
+        'f' => create_swift_type(Kind::Structure, "Float".to_string()),
+        'h' => create_swift_type(Kind::Structure, "Set".to_string()),
+        'I' => create_swift_type(Kind::Structure, "DefaultIndices".to_string()),
+        'i' => create_swift_type(Kind::Structure, "Int".to_string()),
+        'J' => create_swift_type(Kind::Structure, "Character".to_string()),
+        'N' => create_swift_type(Kind::Structure, "ClosedRange".to_string()),
+        'n' => create_swift_type(Kind::Structure, "Range".to_string()),
+        'O' => create_swift_type(Kind::Structure, "ObjectIdentifier".to_string()),
+        'P' => create_swift_type(Kind::Structure, "UnsafePointer".to_string()),
+        'p' => create_swift_type(Kind::Structure, "UnsafeMutablePointer".to_string()),
+        'R' => create_swift_type(Kind::Structure, "UnsafeBufferPointer".to_string()),
+        'r' => create_swift_type(Kind::Structure, "UnsafeMutableBufferPointer".to_string()),
+        'S' => create_swift_type(Kind::Structure, "String".to_string()),
+        's' => create_swift_type(Kind::Structure, "Substring".to_string()),
+        'u' => create_swift_type(Kind::Structure, "UInt".to_string()),
+        'V' => create_swift_type(Kind::Structure, "UnsafeRawPointer".to_string()),
+        'v' => create_swift_type(Kind::Structure, "UnsafeMutableRawPointer".to_string()),
+        'W' => create_swift_type(Kind::Structure, "UnsafeRawBufferPointer".to_string()),
+        'w' => create_swift_type(Kind::Structure, "UnsafeMutableRawBufferPointer".to_string()),
+
+        'q' => create_swift_type(Kind::Enum, "Optional".to_string()),
+
+        'B' => create_swift_type(Kind::Protocol, "BinaryFloatingPoint".to_string()),
+        'E' => create_swift_type(Kind::Protocol, "Encodable".to_string()),
+        'e' => create_swift_type(Kind::Protocol, "Decodable".to_string()),
+        'F' => create_swift_type(Kind::Protocol, "FloatingPoint".to_string()),
+        'G' => create_swift_type(Kind::Protocol, "RandomNumberGenerator".to_string()),
+        'H' => create_swift_type(Kind::Protocol, "Hashable".to_string()),
+        'j' => create_swift_type(Kind::Protocol, "Numeric".to_string()),
+        'K' => create_swift_type(Kind::Protocol, "BidirectionalCollection".to_string()),
+        'k' => create_swift_type(Kind::Protocol, "RandomAccessCollection".to_string()),
+        'L' => create_swift_type(Kind::Protocol, "Comparable".to_string()),
+        'l' => create_swift_type(Kind::Protocol, "Collection".to_string()),
+        'M' => create_swift_type(Kind::Protocol, "MutableCollection".to_string()),
+        'm' => create_swift_type(Kind::Protocol, "RangeReplaceableCollection".to_string()),
+        'Q' => create_swift_type(Kind::Protocol, "Equatable".to_string()),
+        'T' => create_swift_type(Kind::Protocol, "Sequence".to_string()),
+        't' => create_swift_type(Kind::Protocol, "IteratorProtocol".to_string()),
+        'U' => create_swift_type(Kind::Protocol, "UnsignedInteger".to_string()),
+        'X' => create_swift_type(Kind::Protocol, "RangeExpression".to_string()),
+        'x' => create_swift_type(Kind::Protocol, "Strideable".to_string()),
+        'Y' => create_swift_type(Kind::Protocol, "RawRepresentable".to_string()),
+        'y' => create_swift_type(Kind::Protocol, "StringProtocol".to_string()),
+        'Z' => create_swift_type(Kind::Protocol, "SignedInteger".to_string()),
+        'z' => create_swift_type(Kind::Protocol, "BinaryInteger".to_string()),
+
+        _ => return None
+    })
 }
 
 pub struct Demangler<'a> {
