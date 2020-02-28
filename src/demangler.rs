@@ -410,3 +410,47 @@ impl Demangler<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_demangler(buffer: &[u8]) -> Demangler {
+        Demangler::new(buffer, 0)
+    }
+
+    #[test]
+    fn test_next_char() {
+        let mut dem = make_demangler(b"abc");
+
+        assert_eq!(dem.next_char().unwrap(), 'a' as u8);
+        assert_eq!(dem.next_char().unwrap(), 'b' as u8);
+        assert_eq!(dem.next_char().unwrap(), 'c' as u8);
+        assert!(dem.next_char().is_none());
+    }
+
+    #[test]
+    fn test_peek_char() {
+        let mut dem = make_demangler(b"abc");
+
+        assert_eq!(dem.peek_char().unwrap(), 'a' as u8);
+        assert_eq!(dem.peek_char().unwrap(), 'a' as u8);
+
+        let mut dem = make_demangler(b"");
+
+        assert!(dem.peek_char().is_none());
+    }
+
+    #[test]
+    fn test_next_char_skip_padding() {
+        let mut dem = make_demangler(b"a\xFF\xFF\xFFb");
+
+        assert_eq!(dem.next_char_skip_padding().unwrap(), 'a' as u8);
+        assert_eq!(dem.next_char_skip_padding().unwrap(), 'b' as u8);
+        assert!(dem.next_char_skip_padding().is_none());
+
+        let mut dem = make_demangler(b"\xFF\xFF");
+
+        assert!(dem.next_char_skip_padding().is_none());
+    }
+}
