@@ -481,9 +481,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_push_back_when_empty() {
-        let mut dem = make_demangler(b"");
-
-        dem.push_back()
+        make_demangler(b"").push_back()
     }
 
     #[test]
@@ -564,5 +562,46 @@ mod tests {
         dem.next_char();
         dem.next_char();
         assert_eq!(dem.demangle_natural().ok().unwrap(), 123);
+    }
+
+    #[test]
+    fn test_demangle_word_subst() {
+        let mut dem = make_demangler(b"adbCF");
+
+        dem.add_word_subst("Abc".to_string());
+        dem.add_word_subst("Foo".to_string());
+        dem.add_word_subst("Bar".to_string());
+        dem.add_word_subst("Baz".to_string());
+
+        let (part, more) = dem.demangle_word_subst().ok().unwrap();
+        assert_eq!("Abc", part);
+        assert!(more);
+
+        let (part, more) = dem.demangle_word_subst().ok().unwrap();
+        assert_eq!("Baz", part);
+        assert!(more);
+
+        let (part, more) = dem.demangle_word_subst().ok().unwrap();
+        assert_eq!("Foo", part);
+        assert!(more);
+
+        let (part, more) = dem.demangle_word_subst().ok().unwrap();
+        assert_eq!("Bar", part);
+        assert!(!more);
+
+        // F stands for index 5, which is OOB
+        assert!(dem.demangle_word_subst().is_err());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_demangle_word_subst_panic_on_digit() {
+        make_demangler(b"123").demangle_word_subst();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_demangle_word_subst_panic_on_eof() {
+        make_demangler(b"").demangle_word_subst();
     }
 }
