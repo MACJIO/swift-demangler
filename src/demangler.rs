@@ -427,24 +427,30 @@ impl Demangler<'_> {
         if subst_idx >= Self::MAX_WORD_SUBSTS {
             Err(Error::new(
                 ErrorKind::InvalidWordSubstIndex,
-                format!("Invalid word index {} at position {}.", word_idx, self.position),
+                format!("Invalid word index {} at position {}.", subst_idx, self.position),
                 self.position
             ))
         } else if repeat_count >= Self::MAX_REPEAT_COUNT {
             Err(Error::new(
                 ErrorKind::InvalidRepeatCountNumber,
-                format!("Invalid repeat count number {} at position {}.", word_idx, self.position),
+                format!("Invalid repeat count number {} at position {}.", repeat_count, self.position),
                 self.position
             ))
         } else {
-            let node = self.substitutions.get(subst_idx)?;
+            let node = self.substitutions.get(subst_idx).ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidWordSubstIndex,
+                    format!("Invalid word index {} at position {}.", subst_idx, self.position),
+                    self.position
+                )
+            })?.clone();
 
             repeat_count -= 1;
             while repeat_count > 1 {
                 self.push_node(node.clone());
             }
 
-            node
+            Ok(node)
         }
     }
 
