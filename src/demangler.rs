@@ -445,9 +445,9 @@ impl Demangler<'_> {
                 )
             })?.clone();
 
-            repeat_count -= 1;
-            while repeat_count > 1 {
+            while repeat_count > 0 {
                 self.push_node(node.clone());
+                repeat_count -= 1;
             }
 
             Ok(node)
@@ -462,6 +462,11 @@ impl Demangler<'_> {
     #[cfg(test)]
     pub fn words(&mut self) -> &Vec<String> {
         &self.words
+    }
+
+    #[cfg(test)]
+    pub fn add_subst(&mut self, subst: Rc<Node>) {
+        self.substitutions.push(subst);
     }
 }
 
@@ -690,5 +695,21 @@ mod tests {
         } else {
             panic!("Invalid payload kind.")
         }
+    }
+
+    #[test]
+    fn test_push_multi_substitutions() {
+        let mut dem = make_demangler(b"");
+
+        let node = Rc::new(Node::new(Kind::AnonymousDescriptor, Payload::None));
+
+        dem.add_subst(node);
+        dem.push_multi_substitutions(3, 0).unwrap_or_else(|e| {
+            panic!("{:?}", e);
+        });
+
+        dem.pop_node().expect("Expected at least 1 node");
+        dem.pop_node().expect("Expected at least 2 nodes");
+        dem.pop_node().expect("Expected at least 3 nodes");
     }
 }
