@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::node::{self, kind, Node, Kind, Payload};
+use crate::node::{kind, Node, Kind, Payload};
 use crate::punycode;
 use crate::util;
 
@@ -643,13 +643,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_demangle_word_subst_panic_on_digit() {
-        make_demangler(b"123").demangle_word_subst();
+        make_demangler(b"123").demangle_word_subst().unwrap();
     }
 
     #[test]
     #[should_panic]
     fn test_demangle_word_subst_panic_on_eof() {
-        make_demangler(b"").demangle_word_subst();
+        make_demangler(b"").demangle_word_subst().unwrap();
     }
 
     #[test]
