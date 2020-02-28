@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::node::{Node, Kind, Payload};
+use crate::node::{self, kind, Node, Kind, Payload};
 use crate::punycode;
 use crate::util;
 
@@ -151,6 +151,20 @@ impl Demangler<'_> {
             Err(Error::new(
                 ErrorKind::MissingChildNode,
                 "A Type node must have a child.".to_string(),
+                self.position
+            ))
+        }
+    }
+
+    pub fn pop_type_and_get_any_generic(&mut self) -> Result<Rc<Node>, Error> {
+        let child = self.pop_type_and_get_child()?;
+
+        if kind::is_any_generic(child.kind()) {
+            Ok(child)
+        } else {
+            Err(Error::new(
+                ErrorKind::UnexpectedNodeKind,
+                "Expected a node of any generic type.".to_string(),
                 self.position
             ))
         }
