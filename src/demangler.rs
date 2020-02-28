@@ -10,6 +10,7 @@ pub enum ErrorKind {
     UnexpectedCharacter,
     InvalidIdentifier,
     InvalidWordSubstIndex,
+    InvalidRepeatCountNumber,
     InvalidOperator,
     IntegerOverflow,
     InvalidIndexMangling,
@@ -46,6 +47,7 @@ pub struct Demangler<'a> {
 
 impl Demangler<'_> {
     const MAX_WORD_SUBSTS: usize = 26;
+    const MAX_REPEAT_COUNT: usize = 2048;
 
     pub fn new(buffer: &[u8], address: usize) -> Demangler {
         Demangler {
@@ -418,6 +420,37 @@ impl Demangler<'_> {
             self.substitutions.push(node_ref.clone());
 
             Ok(node_ref)
+        }
+    }
+
+    pub fn push_multi_substitutions(&mut self, mut repeat_count: usize, subst_idx: usize) -> Result<Rc<Node>, Error> {
+        if subst_idx >= Self::MAX_WORD_SUBSTS {
+            Err(Error::new(
+                ErrorKind::InvalidWordSubstIndex,
+                format!("Invalid word index {} at position {}.", subst_idx, self.position),
+                self.position
+            ))
+        } else if repeat_count >= Self::MAX_REPEAT_COUNT {
+            Err(Error::new(
+                ErrorKind::InvalidRepeatCountNumber,
+                format!("Invalid repeat count number {} at position {}.", repeat_count, self.position),
+                self.position
+            ))
+        } else {
+            let node = self.substitutions.get(subst_idx).ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidWordSubstIndex,
+                    format!("Invalid word index {} at position {}.", subst_idx, self.position),
+                    self.position
+                )
+            })?.clone();
+
+            repeat_count -= 1;
+            while repeat_count > 1 {
+                self.push_node(node.clone());
+            }
+
+            Ok(node)
         }
     }
 
