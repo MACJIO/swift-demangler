@@ -4,7 +4,7 @@ use crate::node::{self, kind, Node, Kind, Payload};
 use crate::punycode;
 use crate::util;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum ErrorKind {
     UnexpectedEndOfName,
     UnexpectedCharacter,
@@ -18,6 +18,7 @@ pub enum ErrorKind {
     MissingChildNode,
 }
 
+#[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
     message: String,
@@ -204,10 +205,12 @@ impl Demangler<'_> {
         let mut num = 0u32;
         loop {
             if let Some(c) = self.peek_char() {
+                self.position += 1;
+
                 if util::is_digit(c as char) {
                     // An integer overflow will cause a panic, so better check for it.
                     num = num.checked_mul(10)
-                        .and_then(|n| n.checked_add(c as u32))
+                        .and_then(|n| n.checked_add(c as u32 - '0' as u32))
                         .ok_or_else(|| Error::new(
                             ErrorKind::IntegerOverflow,
                             format!(
@@ -409,6 +412,16 @@ impl Demangler<'_> {
             Ok(node_ref)
         }
     }
+
+    #[cfg(test)]
+    pub fn add_word_subst(&mut self, word: String) {
+        self.words.push(word)
+    }
+
+    #[cfg(test)]
+    pub fn words(&mut self) -> &Vec<String> {
+        &self.words
+    }
 }
 
 #[cfg(test)]
@@ -501,5 +514,55 @@ mod tests {
 
         dem.push_node(node);
         assert!(dem.pop_node_of_kind(Kind::Allocator).is_ok());
+    }
+
+    #[test]
+    fn test_pop_type_and_get_child() {
+        let mut dem = make_demangler(b"");
+        let child = Rc::new(Node::new(Kind::Type, Payload::None));
+        let node = Rc::new(Node::new(Kind::Type, Payload::Children(vec![child])));
+
+        dem.push_node(node);
+
+        assert!(dem.pop_type_and_get_child().is_ok());
+    }
+
+    #[test]
+    fn test_pop_type_and_get_any_generic() {
+        let mut dem = make_demangler(b"");
+        let child = Rc::new(Node::new(Kind::Structure, Payload::None));
+        let node = Rc::new(Node::new(Kind::Type, Payload::Children(vec![child])));
+
+        dem.push_node(node);
+
+        assert!(dem.pop_type_and_get_child().is_ok());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_pop_type_and_get_any_generic_fail() {
+        let mut dem = make_demangler(b"");
+        let child = Rc::new(Node::new(Kind::Allocator, Payload::None));
+        let node = Rc::new(Node::new(Kind::Type, Payload::Children(vec![child])));
+
+        dem.push_node(node);
+
+        assert!(dem.pop_type_and_get_any_generic().is_ok());
+    }
+
+    #[test]
+    fn test_demangle_natural() {
+        let mut dem = make_demangler(b"123abc");
+
+        assert_eq!(dem.demangle_natural().ok().unwrap(), 123);
+        assert!(dem.demangle_natural().is_err());
+
+        let mut dem = make_demangler(b"abc123");
+
+        assert!(dem.demangle_natural().is_err());
+        dem.next_char();
+        dem.next_char();
+        dem.next_char();
+        assert_eq!(dem.demangle_natural().ok().unwrap(), 123);
     }
 }
