@@ -112,8 +112,8 @@ impl Demangler<'_> {
     }
 
     /// Pushes a node onto the node stack.
-    pub fn push_node(&mut self, node: Node) {
-        self.node_stack.push(Rc::new(node))
+    pub fn push_node(&mut self, node: Rc<Node>) {
+        self.node_stack.push(node)
     }
 
     /// Pops a node from the node stack.
@@ -452,5 +452,54 @@ mod tests {
         let mut dem = make_demangler(b"\xFF\xFF");
 
         assert!(dem.next_char_skip_padding().is_none());
+    }
+
+    #[test]
+    fn test_next_if() {
+        let mut dem = make_demangler(b"abc");
+
+        assert_eq!(dem.next_if('a' as u8).unwrap(), true);
+        assert_eq!(dem.next_if('g' as u8).unwrap(), false);
+        assert_eq!(dem.next_if('b' as u8).unwrap(), true);
+        assert_eq!(dem.next_if('c' as u8).unwrap(), true);
+        assert!(dem.next_if('c' as u8).is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_push_back_when_empty() {
+        let mut dem = make_demangler(b"");
+
+        dem.push_back()
+    }
+
+    #[test]
+    fn test_push_back() {
+        let mut dem = make_demangler(b"abc");
+
+        dem.next_char().unwrap();
+        dem.next_char().unwrap();
+        dem.push_back();
+        dem.push_back();
+
+        assert_eq!(dem.peek_char().unwrap(), 'a' as u8);
+    }
+
+    #[test]
+    fn test_push_pop_node() {
+        let mut dem = make_demangler(b"");
+        let node = Rc::new(Node::new(Kind::Allocator, Payload::None));
+
+        dem.push_node(node);
+        dem.pop_node().unwrap();
+    }
+
+    #[test]
+    fn test_pop_node_of_kind() {
+        let mut dem = make_demangler(b"");
+        let node = Rc::new(Node::new(Kind::Allocator, Payload::None));
+
+        dem.push_node(node);
+        assert!(dem.pop_node_of_kind(Kind::Allocator).is_ok());
     }
 }
