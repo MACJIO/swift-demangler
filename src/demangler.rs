@@ -47,7 +47,7 @@ pub struct Demangler<'a> {
 
 impl Demangler<'_> {
     const MAX_WORD_SUBSTS: usize = 26;
-    const MAX_REPEAT_COUNT: usize = 2048;
+    const MAX_REPEAT_COUNT: i32 = 2048;
 
     pub fn new(buffer: &[u8], address: usize) -> Demangler {
         Demangler {
@@ -423,7 +423,7 @@ impl Demangler<'_> {
         }
     }
 
-    pub fn push_multi_substitutions(&mut self, mut repeat_count: usize, subst_idx: usize) -> Result<Rc<Node>, Error> {
+    pub fn push_multi_substitutions(&mut self, mut repeat_count: i32, subst_idx: usize) -> Result<Rc<Node>, Error> {
         if subst_idx >= Self::MAX_WORD_SUBSTS {
             Err(Error::new(
                 ErrorKind::InvalidWordSubstIndex,
@@ -451,6 +451,54 @@ impl Demangler<'_> {
             }
 
             Ok(node)
+        }
+    }
+
+    pub fn demangle_multi_substitutions(&mut self) -> Result<Rc<Node>, Error> {
+        let mut repeat_count: i32 = -1;
+        loop {
+            let c = self.next_char().ok_or_else(|| {
+                Error::new(
+                    ErrorKind::UnexpectedEndOfName,
+                    format!("Expected a character at position {}.", self.position),
+                    self.position
+                )
+            })?;
+            if c == 0 {
+                return Err(Error::new(
+                    ErrorKind::UnexpectedEndOfName,
+                    format!("Unexpected end of text."),
+                    self.position
+                ));
+            }
+            if util::is_lower_letter(c as char) {
+                let node = self.push_multi_substitutions(repeat_count, c as usize - 'a' as usize)?;
+                self.push_node(node);
+                repeat_count = -1;
+                continue;
+            }
+            if util::is_upper_letter(c as char) {
+                self.push_multi_substitutions(repeat_count, c as usize - 'a' as usize)?;
+            }
+            if c as char == '_' {
+                let idx = repeat_count + 27;
+                if idx > self.substitutions.len() as i32 {
+                    return Err(Error::new(
+                        ErrorKind::InvalidWordSubstIndex,
+                        format!("Invalid substitutions word index"),
+                        self.position
+                    ));
+                }
+                return Ok(self.substitutions.get(idx as usize).ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::InvalidWordSubstIndex,
+                        format!("Invalid substitutions word index"),
+                        self.position
+                    )
+                })?.clone());
+            }
+            self.push_back();
+            repeat_count = self.demangle_natural()? as i32;
         }
     }
 
