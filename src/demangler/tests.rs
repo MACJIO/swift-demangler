@@ -247,7 +247,7 @@ fn test_push_multi_substitutions() {
 }
 
 #[test]
-fn test_c() {
+fn test_demangle_multi_substitutions() {
     let mut dem = make_demangler(b"A3aB");
 
     let node = Rc::new(Node::new(Kind::AnonymousDescriptor, Payload::None));
