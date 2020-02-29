@@ -234,7 +234,23 @@ fn test_push_multi_substitutions() {
         panic!("{:?}", e);
     });
 
-    dem.pop_node().expect("Expected at least 1 node");
-    dem.pop_node().expect("Expected at least 2 nodes");
-    dem.pop_node().expect("Expected at least 3 nodes");
+    dem.pop_node().expect("Expected 2 nodes on node stack");
+    dem.pop_node().expect("Expected 2 nodes on node stack");
+}
+
+#[test]
+fn test_c() {
+    let mut dem = make_demangler(b"A3aB");
+
+    let node = Rc::new(Node::new(Kind::AnonymousDescriptor, Payload::None));
+    dem.add_subst(node);
+    let node = Rc::new(Node::new(Kind::Deallocator, Payload::None));
+    dem.add_subst(node);
+
+    let node = dem.demangle_multi_substitutions().ok().unwrap();
+    node.print();
+    let node = dem.demangle_multi_substitutions().unwrap_or_else(|e| {
+        panic!("{:?}", e);
+    });
+    node.print();
 }

@@ -511,7 +511,7 @@ impl Demangler<'_> {
     }
 
     pub fn push_multi_substitutions(&mut self, mut repeat_count: u32, subst_idx: usize) -> Result<Rc<Node>, Error> {
-        if repeat_count >= Self::MAX_REPEAT_COUNT {
+        if repeat_count >= Self::MAX_REPEAT_COUNT || repeat_count == 0 {
             Err(Error::new(
                 ErrorKind::InvalidRepeatCountNumber,
                 format!("Invalid repeat count number {} at position {}.", repeat_count, self.position),
@@ -526,9 +526,8 @@ impl Demangler<'_> {
                 )
             })?.clone();
 
-            while repeat_count > 0 {
+            for _ in 1..repeat_count {
                 self.push_node(node.clone());
-                repeat_count -= 1;
             }
 
             Ok(node)
@@ -547,6 +546,7 @@ impl Demangler<'_> {
 
             let mut repeat_count: u32 = 1;
             if util::is_digit(c) {
+                self.push_back();
                 repeat_count = self.demangle_natural()?;
                 c = self.next_char().ok_or_else(||
                     Error::new(
@@ -597,5 +597,10 @@ impl Demangler<'_> {
     #[cfg(test)]
     pub fn add_subst(&mut self, subst: Rc<Node>) {
         self.substitutions.push(subst);
+    }
+
+    #[cfg(test)]
+    pub fn position(&mut self) -> usize {
+        self.position
     }
 }
