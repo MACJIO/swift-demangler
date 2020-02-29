@@ -115,6 +115,18 @@ impl Node {
             }
         }
     }
+
+    #[cfg(test)]
+    pub fn print(&self) {
+        let payload = match &self.payload {
+            Payload::None => "None".to_string(),
+            Payload::Index(idx) => format!("{:x}", *idx),
+            Payload::Children(_) => "Some children".to_string(),
+            Payload::Text(text) => text.to_string(),
+        };
+
+        println!("Node:\n  Kind: {:?}\n  Payload: {:?}", self.kind, payload);
+    }
 }
 
 pub fn is_alias_node(node: &Node) -> bool {
