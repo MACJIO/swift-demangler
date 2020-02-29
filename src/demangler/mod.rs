@@ -3,11 +3,14 @@ use std::rc::Rc;
 use crate::node::{kind, Node, Kind, Payload};
 use crate::punycode;
 use crate::util;
+use std::panic::resume_unwind;
 
 #[cfg(test)]
 mod tests;
 
 const STDLIB_NAME: &str = "Swift";
+const MANGLING_MODULE_OBJC: &str = "__C";
+const MANGLING_MODULE_CLANG_IMPORTER: &str = "__C_Synthesized";
 
 #[derive(Copy, Clone, Debug)]
 pub enum ErrorKind {
@@ -40,6 +43,10 @@ impl Error {
             position
         }
     }
+}
+
+fn create_node(kind: Kind, payload: Payload) -> Rc<Node> {
+    Rc::new(Node::new(kind, payload))
 }
 
 fn create_text_node(kind: Kind, text: String) -> Rc<Node> {
@@ -580,6 +587,74 @@ impl Demangler<'_> {
             let node = self.push_multi_substitutions(repeat_count, subst_idx)?;
             if is_last {
                 break Ok(node)
+            }
+        }
+    }
+
+    pub fn demangle_standard_substitution(&mut self) -> Result<Rc<Node>, Error> {
+        let c = self.next_char().ok_or_else(|| {
+            Error::new(
+                ErrorKind::UnexpectedEndOfName,
+                format!("Expected a standard substitution at position {}.", self.position),
+                self.position
+            )
+        })? as char;
+
+        match c {
+            'o' => Ok(create_text_node(Kind::Module, MANGLING_MODULE_OBJC.to_string())),
+            'C' => Ok(create_text_node(Kind::Module, MANGLING_MODULE_CLANG_IMPORTER.to_string())),
+            'g' => {
+                let optional_ty = create_type_node(
+                    create_node_with_children(
+                        Kind::BoundGenericEnum,
+                        vec![
+                            create_swift_type(Kind::Enum, "Optional".to_string()),
+                            create_node_with_children(Kind::TypeList, vec![
+                                self.pop_node_of_kind(Kind::Type)?
+                            ])
+                        ]
+                    )
+                );
+                self.substitutions.push(optional_ty.clone());
+                Ok(optional_ty)
+            },
+            _ => {
+                self.push_back();
+
+                let repeat_count = if util::is_digit(c) {
+                    self.demangle_natural()?
+                } else {
+                    1
+                };
+                if repeat_count > Demangler::MAX_REPEAT_COUNT || repeat_count == 0 {
+                    Err(Error::new(
+                        ErrorKind::InvalidRepeatCountNumber,
+                        format!("Invalid repeat count {} at position {}.", repeat_count, self.position),
+                        self.position
+                    ))
+                } else {
+                    // next_char borrows self mutably, while char_or_err borrows self immutably,
+                    // so we need to call them separately here.
+                    let c = self.next_char();
+                    let c = self.char_or_err(c)? as char;
+                    let subst_node = create_standard_substitution(c)
+                        .ok_or_else(|| {
+                            Error::new(
+                                ErrorKind::InvalidStandardSubst,
+                                format!(
+                                    "Invalid standard substitution character {} at position {}",
+                                    c, self.position
+                                ),
+                                self.position
+                            )
+                        })?;
+
+                    for _ in 1..repeat_count {
+                        self.push_node(subst_node.clone())
+                    }
+
+                    Ok(subst_node)
+                }
             }
         }
     }
