@@ -5,6 +5,14 @@ fn make_demangler(buffer: &[u8]) -> Demangler {
     Demangler::new(buffer, 0)
 }
 
+fn assert_node_kind(node: &Node, kind: Kind) {
+    assert_eq!(node.kind(), kind)
+}
+
+fn assert_node_payload(node: &Node, payload: Payload) {
+    assert_eq!(*node.payload(), payload)
+}
+
 #[test]
 fn test_next_char() {
     let mut dem = make_demangler(b"abc");
@@ -237,4 +245,42 @@ fn test_push_multi_substitutions() {
     dem.pop_node().expect("Expected at least 1 node");
     dem.pop_node().expect("Expected at least 2 nodes");
     dem.pop_node().expect("Expected at least 3 nodes");
+}
+
+#[test]
+fn test_demangle_standard_substitution_objc_module() {
+    let mut dem = make_demangler(b"o");
+
+    let node = dem.demangle_standard_substitution()
+        .unwrap_or_else(|e| {
+        panic!("{:?}", e);
+    });
+
+    assert_node_kind(&node, Kind::Module);
+    assert_node_payload(&node, Payload::Text(MANGLING_MODULE_OBJC.to_string()));
+}
+
+#[test]
+fn test_demangle_standard_substitution_clang_importer_module() {
+    let mut dem = make_demangler(b"C");
+
+    let node = dem.demangle_standard_substitution()
+        .unwrap_or_else(|e| {
+        panic!("{:?}", e);
+    });
+
+    assert_node_kind(&node, Kind::Module);
+    assert_node_payload(&node, Payload::Text(MANGLING_MODULE_CLANG_IMPORTER.to_string()));
+}
+
+#[test]
+fn test_demangle_standard_substitution_known_type() {
+    let mut dem = make_demangler(b"u");
+
+    let node = dem.demangle_standard_substitution()
+        .unwrap_or_else(|e| {
+            panic!("{:?}", e);
+        });
+
+    assert_eq!(node, create_swift_type(Kind::Structure, "UInt".to_string()))
 }
