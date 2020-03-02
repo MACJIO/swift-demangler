@@ -241,6 +241,26 @@ impl Demangler<'_> {
         }
     }
 
+    pub fn pop_module(&mut self) -> Result<Rc<Node>, Error> {
+        self.pop_node().ok_or_else(|| {
+            Error::new(
+                ErrorKind::MissingNode,
+                "Expected a node.".to_string()
+            )
+        }).and_then(|node| {
+            if let Kind::Identifier = node.kind() {
+                Ok(create_node(Kind::Module, (*node.payload()).clone()))
+            } else if let Kind::Module = node.kind() {
+                Ok(node)
+            } else {
+                Err(Error::new(
+                    ErrorKind::UnexpectedNodeKind,
+                    "Expected an Identifier or a Module node.".to_string()
+                ))
+            }
+        })
+    }
+
     pub fn char_or_err(&self, c: Option<u8>) -> Result<u8, Error> {
         if let Some(c) = c {
             Ok(c)
