@@ -204,15 +204,13 @@ impl Demangler<'_> {
             } else {
                 Err(Error::new(
                     ErrorKind::UnexpectedNodeKind,
-                    format!("Unexpected node kind."),
-                    self.position)
-                )
+                    format!("Unexpected node kind.")
+                ))
             }
         } else {
             Err(Error::new(
                 ErrorKind::MissingNode,
-                format!("Expected a node."),
-                self.position
+                format!("Expected a node.")
             ))
         }
     }
@@ -225,8 +223,7 @@ impl Demangler<'_> {
         } else {
             Err(Error::new(
                 ErrorKind::MissingChildNode,
-                "A Type node must have a child.".to_string(),
-                self.position
+                "A Type node must have a child.".to_string()
             ))
         }
     }
@@ -239,8 +236,7 @@ impl Demangler<'_> {
         } else {
             Err(Error::new(
                 ErrorKind::UnexpectedNodeKind,
-                "Expected a node of any generic type.".to_string(),
-                self.position
+                "Expected a node of any generic type.".to_string()
             ))
         }
     }
@@ -251,8 +247,7 @@ impl Demangler<'_> {
         } else {
             Err(Error::new(
                 ErrorKind::UnexpectedEndOfName,
-                format!("Expected a character at position {}.", self.position),
-                self.position
+                format!("Expected a character at position {}.", self.position)
             ))
         }
     }
@@ -266,8 +261,7 @@ impl Demangler<'_> {
                 format!(
                     "Unexpected character {} at position {}, expected a digit.",
                     c as char, self.position
-                ),
-                self.position
+                )
             ))
         }
     }
@@ -290,8 +284,7 @@ impl Demangler<'_> {
                             format!(
                                 "An integer overflow occurred while reading natural at position {}.",
                                 self.position
-                            ),
-                            self.position
+                            )
                         ))?;
                     continue
                 }
@@ -315,22 +308,19 @@ impl Demangler<'_> {
                 Ok(num.checked_add(1).ok_or_else(|| {
                     Error::new(
                         ErrorKind::IntegerOverflow,
-                        format!("An integer overflow occurred while demangling an index."),
-                        self.position
+                        format!("An integer overflow occurred while demangling an index.")
                     )
                 })?)
             } else {
                 Err(Error::new(
                     ErrorKind::InvalidIndexMangling,
-                    format!("Expected an underscore at the end of an index mangling."),
-                    self.position
+                    format!("Expected an underscore at the end of an index mangling.")
                 ))
             }
         } else {
             return Err(Error::new(
                 ErrorKind::UnexpectedEndOfName,
-                format!("Expected an index at position {}.", self.position),
-                self.position
+                format!("Expected an index at position {}.", self.position)
             ))
         }
     }
@@ -359,8 +349,7 @@ impl Demangler<'_> {
         } else {
             Err(Error::new(
                 ErrorKind::InvalidWordSubstIndex,
-                format!("Invalid word index {} at position {}.", word_idx, self.position),
-                self.position
+                format!("Invalid word index {} at position {}.", word_idx, self.position)
             ))
         }
     }
@@ -414,8 +403,7 @@ impl Demangler<'_> {
                     format!(
                         "Expected {} characters at position {}, found {}.",
                         num_chars, self.position, chars_avail
-                    ),
-                    self.position
+                    )
                 ))
             }
 
@@ -424,8 +412,7 @@ impl Demangler<'_> {
             let string = String::from_utf8(slice).or_else(|_| {
                 Err(Error::new(
                     ErrorKind::InvalidIdentifier,
-                    format!("Invalid identifier at position {}.", self.position),
-                    self.position
+                    format!("Invalid identifier at position {}.", self.position)
                 ))
             })?;
 
@@ -433,8 +420,7 @@ impl Demangler<'_> {
                 identifier += &punycode::decode(&string).or_else(|_| {
                     Err(Error::new(
                         ErrorKind::InvalidIdentifier,
-                        format!("Failed to decode punycode at position {}.", self.position),
-                        self.position
+                        format!("Failed to decode punycode at position {}.", self.position)
                     ))
                 })?;
             } else {
@@ -479,8 +465,7 @@ impl Demangler<'_> {
         if identifier.is_empty() {
             Err(Error::new(
                 ErrorKind::InvalidIdentifier,
-                format!("Empty identifier at position {}.", self.position),
-                self.position
+                format!("Empty identifier at position {}.", self.position)
             ))
         } else {
             let node_ref = Rc::new(Node::new(
@@ -495,28 +480,19 @@ impl Demangler<'_> {
         }
     }
 
-    pub fn push_multi_substitutions(&mut self, mut repeat_count: u32, subst_idx: usize) -> Result<Rc<Node>, Error> {
-        if repeat_count >= Self::MAX_REPEAT_COUNT || repeat_count == 0 {
-            Err(Error::new(
-                ErrorKind::InvalidRepeatCountNumber,
-                format!("Invalid repeat count number {} at position {}.", repeat_count, self.position),
-                self.position
-            ))
-        } else {
-            let node = self.substitutions.get(subst_idx).ok_or_else(|| {
-                Error::new(
-                    ErrorKind::InvalidWordSubstIndex,
-                    format!("Invalid word index {} at position {}.", subst_idx, self.position),
-                    self.position
-                )
-            })?.clone();
+    pub fn push_multi_substitutions(&mut self, repeat_count: u32, subst_idx: usize) -> Result<Rc<Node>, Error> {
+        let node = self.substitutions.get(subst_idx).ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidWordSubstIndex,
+                format!("Invalid word index {} at position {}.", subst_idx, self.position)
+            )
+        })?.clone();
 
-            for _ in 1..repeat_count {
-                self.push_node(node.clone());
-            }
-
-            Ok(node)
+        for _ in 1..repeat_count {
+            self.push_node(node.clone());
         }
+
+        Ok(node)
     }
 
     pub fn demangle_multi_substitutions(&mut self) -> Result<Rc<Node>, Error> {
@@ -524,20 +500,18 @@ impl Demangler<'_> {
             let mut c = self.next_char().ok_or_else(|| {
                 Error::new(
                     ErrorKind::UnexpectedEndOfName,
-                    format!("Expected a character at position {}.", self.position),
-                    self.position
+                    format!("Expected a character at position {}.", self.position)
                 )
             })? as char;
 
             let mut repeat_count: u32 = 1;
             if util::is_digit(c) {
                 self.push_back();
-                repeat_count = self.demangle_natural()?;
+                repeat_count = self.demangle_repeat_count()?;
                 c = self.next_char().ok_or_else(||
                     Error::new(
                         ErrorKind::UnexpectedEndOfName,
-                        format!("Expected a character at position {}.", self.position),
-                        self.position
+                        format!("Expected a character at position {}.", self.position)
                     )
                 )? as char;
             }
@@ -557,8 +531,7 @@ impl Demangler<'_> {
             } else {
                 return Err(Error::new(
                     ErrorKind::UnexpectedCharacter,
-                    "Unexpected character in substitution.".to_string(),
-                    self.position
+                    "Unexpected character in substitution.".to_string()
                 ))
             }
 
@@ -569,12 +542,24 @@ impl Demangler<'_> {
         }
     }
 
+    pub fn demangle_repeat_count(&mut self) -> Result<u32, Error> {
+        let repeat_count = self.demangle_natural()?;
+
+        if repeat_count > Demangler::MAX_REPEAT_COUNT || repeat_count == 0 {
+            Err(Error::new(
+                ErrorKind::InvalidRepeatCountNumber,
+                format!("Invalid repeat count {} at position {}.", repeat_count, self.position)
+            ))
+        } else {
+            Ok(repeat_count)
+        }
+    }
+
     pub fn demangle_standard_substitution(&mut self) -> Result<Rc<Node>, Error> {
         let c = self.next_char().ok_or_else(|| {
             Error::new(
                 ErrorKind::UnexpectedEndOfName,
-                format!("Expected a standard substitution at position {}.", self.position),
-                self.position
+                format!("Expected a standard substitution at position {}.", self.position)
             )
         })? as char;
 
@@ -601,39 +586,31 @@ impl Demangler<'_> {
                 self.push_back();
 
                 let repeat_count = if util::is_digit(c) {
-                    self.demangle_natural()?
+                    self.demangle_repeat_count()?
                 } else {
                     1
                 };
-                if repeat_count > Demangler::MAX_REPEAT_COUNT || repeat_count == 0 {
-                    Err(Error::new(
-                        ErrorKind::InvalidRepeatCountNumber,
-                        format!("Invalid repeat count {} at position {}.", repeat_count, self.position),
-                        self.position
-                    ))
-                } else {
-                    // next_char borrows self mutably, while char_or_err borrows self immutably,
-                    // so we need to call them separately here.
-                    let c = self.next_char();
-                    let c = self.char_or_err(c)? as char;
-                    let subst_node = create_standard_substitution(c)
-                        .ok_or_else(|| {
-                            Error::new(
-                                ErrorKind::InvalidStandardSubst,
-                                format!(
-                                    "Invalid standard substitution character {} at position {}",
-                                    c, self.position
-                                ),
-                                self.position
+
+                // next_char borrows self mutably, while char_or_err borrows self immutably,
+                // so we need to call them separately here.
+                let c = self.next_char();
+                let c = self.char_or_err(c)? as char;
+                let subst_node = create_standard_substitution(c)
+                    .ok_or_else(|| {
+                        Error::new(
+                            ErrorKind::InvalidStandardSubst,
+                            format!(
+                                "Invalid standard substitution character {} at position {}",
+                                c, self.position
                             )
-                        })?;
+                        )
+                    })?;
 
-                    for _ in 1..repeat_count {
-                        self.push_node(subst_node.clone())
-                    }
-
-                    Ok(subst_node)
+                for _ in 1..repeat_count {
+                    self.push_node(subst_node.clone())
                 }
+
+                Ok(subst_node)
             }
         }
     }

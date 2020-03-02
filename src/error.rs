@@ -18,15 +18,13 @@ pub enum ErrorKind {
 pub struct Error {
     kind: ErrorKind,
     message: String,
-    position: usize,
 }
 
 impl Error {
-    pub fn new(kind: ErrorKind, message: String, position: usize) -> Error {
+    pub fn new(kind: ErrorKind, message: String) -> Error {
         Error {
             kind,
-            message,
-            position
+            message
         }
     }
 }

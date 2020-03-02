@@ -25,12 +25,12 @@ fn test_next_char() {
 
 #[test]
 fn test_peek_char() {
-    let mut dem = make_demangler(b"abc");
+    let dem = make_demangler(b"abc");
 
     assert_eq!(dem.peek_char().unwrap(), 'a' as u8);
     assert_eq!(dem.peek_char().unwrap(), 'a' as u8);
 
-    let mut dem = make_demangler(b"");
+    let dem = make_demangler(b"");
 
     assert!(dem.peek_char().is_none());
 }
