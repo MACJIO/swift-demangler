@@ -3,7 +3,6 @@ use std::rc::Rc;
 use crate::node::{kind, Node, Kind, Payload};
 use crate::punycode;
 use crate::util;
-use std::panic::resume_unwind;
 
 #[cfg(test)]
 mod tests;
@@ -11,6 +10,13 @@ mod tests;
 const STDLIB_NAME: &str = "Swift";
 const MANGLING_MODULE_OBJC: &str = "__C";
 const MANGLING_MODULE_CLANG_IMPORTER: &str = "__C_Synthesized";
+
+const BUILTIN_TYPE_NAME_BRIDGEOBJECT: &str = "Builtin.BridgeObject";
+const BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER: &str = "Builtin.UnsafeValueBuffer";
+const BUILTIN_TYPE_NAME_FLOAT: &str = "Builtin.FPIEEE";
+const BUILTIN_TYPE_NAME_INT: &str = "Builtin.Int";
+const BUILTIN_TYPE_NAME_INTLITERAL: &str = "Builtin.IntLiteral";
+const BUILTIN_TYPE_NAME_PREFIX: &str = "Builtin.";
 
 #[derive(Copy, Clone, Debug)]
 pub enum ErrorKind {
@@ -657,6 +663,53 @@ impl Demangler<'_> {
                 }
             }
         }
+    }
+
+    pub fn demangle_builtin_type(&mut self) -> Result<Rc<Node>, Error>{
+        let max_type_size: u32 = 4096;
+        let node = match self.next_char() {
+            Some(c) => {
+                match с as char {
+                    'b' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_BRIDGEOBJECT.to_string()),
+                    'B' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER.to_string()),
+                    'f' => {
+                        let size = self.demangle_index()? - 1;
+                        if size > max_type_size {
+                            // return err
+                            unimplemented!();
+                        }
+                        let name = BUILTIN_TYPE_NAME_FLOAT.to_string() + &format!("{}", size);
+                        create_text_node(Kind::BuiltinTypeName, name)
+                    },
+                    'i' => {
+                        let size = self.demangle_index()? - 1;
+                        if size > max_type_size {
+                            // return err
+                            unimplemented!();
+                        }
+                        let name = BUILTIN_TYPE_NAME_INT.to_string() + &format!("{}", size);
+                        create_text_node(Kind::BuiltinTypeName, name)
+                    },
+                    'I' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_INTLITERAL.to_string()),
+                    'v' => {
+                        let elts = self.demangle_index()? - 1;
+                        if elts > max_type_size {
+                            // return err
+                            unimplemented!();
+                        }
+                        let elt_node = self.pop_type_and_get_child()?;
+                        if elt_node.kind() != Kind::BuiltinTypeName || !elt_node.get_text()?.starts_with(BUILTIN_TYPE_NAME_PREFIX) {
+                            // return err
+                            unimplemented!();
+                        }
+                    },
+                    _ => {}
+                }
+            },
+            None => ()
+        };
+
+        Ok(node)
     }
 
     #[cfg(test)]
