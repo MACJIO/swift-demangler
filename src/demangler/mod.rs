@@ -59,6 +59,10 @@ fn create_text_node(kind: Kind, text: String) -> Rc<Node> {
     Rc::new(Node::new(kind, Payload::Text(text)))
 }
 
+fn create_node_with_child(kind: Kind, child: Rc<Node>) -> Rc<Node> {
+    Rc::new(Node::new(kind, Payload::Children(vec![child])))
+}
+
 fn create_node_with_children(kind: Kind, children: Vec<Rc<Node>>) -> Rc<Node> {
     Rc::new(Node::new(kind, Payload::Children(children)))
 }
@@ -615,9 +619,10 @@ impl Demangler<'_> {
                         Kind::BoundGenericEnum,
                         vec![
                             create_swift_type(Kind::Enum, "Optional".to_string()),
-                            create_node_with_children(Kind::TypeList, vec![
+                            create_node_with_child(
+                                Kind::TypeList,
                                 self.pop_node_of_kind(Kind::Type)?
-                            ])
+                            )
                         ]
                     )
                 );
