@@ -4,6 +4,7 @@ pub enum ErrorKind {
     UnexpectedCharacter,
     InvalidIdentifier,
     InvalidWordSubstIndex,
+    InvalidSubstIndex,
     InvalidRepeatCountNumber,
     InvalidOperator,
     IntegerOverflow,

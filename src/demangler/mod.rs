@@ -483,7 +483,7 @@ impl Demangler<'_> {
     pub fn push_multi_substitutions(&mut self, repeat_count: u32, subst_idx: usize) -> Result<Rc<Node>, Error> {
         let node = self.substitutions.get(subst_idx).ok_or_else(|| {
             Error::new(
-                ErrorKind::InvalidWordSubstIndex,
+                ErrorKind::InvalidSubstIndex,
                 format!("Invalid word index {} at position {}.", subst_idx, self.position)
             )
         })?.clone();
