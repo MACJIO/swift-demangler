@@ -1,4 +1,6 @@
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+use enum_map::Enum;
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, Enum)]
 pub enum Kind {
     Allocator,
     AnonymousContext,

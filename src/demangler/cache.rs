@@ -1,15 +1,12 @@
 use std::collections::HashMap;
 use std::collections::hash_map::Values;
 use std::rc::Rc;
+use enum_map::{self, EnumMap};
 
 use crate::node::{Node, Kind, Payload};
 
-pub struct NodeCache {
-    nodes: HashMap<Kind, HashMap<Payload, Rc<Node>>>
-}
-
 pub struct NodeCacheIterator<'a> {
-    outer_iter: Values<'a, Kind, HashMap<Payload, Rc<Node>>>,
+    outer_iter: enum_map::Values<'a, HashMap<Payload, Rc<Node>>>,
     inner_iter: Option<Values<'a, Payload, Rc<Node>>>
 }
 
@@ -17,11 +14,11 @@ impl<'a> Iterator for NodeCacheIterator<'a> {
     type Item = &'a Rc<Node>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut inner_iter = self.inner_iter.as_mut();
+        let inner_iter = self.inner_iter.as_mut();
 
         // in case inner_iter is None the outer_iter is already exhausted
         if let Some(inner_iter) = inner_iter {
-            let mut next = inner_iter.next();
+            let next = inner_iter.next();
 
             // update the inner_iter in case it is exhausted
             if let None = next {
@@ -36,16 +33,23 @@ impl<'a> Iterator for NodeCacheIterator<'a> {
     }
 }
 
+pub struct NodeCache {
+    // EnumMap is quite limited due to the fact that it is impossible to disable
+    // default values generation, however it only simplifies the code here since
+    // we don't need to explicitly create a HashMap for each new kind here. Also
+    // an EnumMap provides better performance than a HashMap for enum keys.
+    nodes: EnumMap<Kind, HashMap<Payload, Rc<Node>>>
+}
+
 impl NodeCache {
     pub fn new() -> NodeCache {
         NodeCache {
-            nodes: HashMap::new()
+            nodes: EnumMap::new()
         }
     }
 
     pub fn create_node(&mut self, kind: Kind, payload: Payload) -> Rc<Node> {
-        let inner_map = self.nodes.entry(kind)
-            .or_insert_with(|| HashMap::new());
+        let inner_map = &mut self.nodes[kind];
 
         let entry = inner_map.entry(payload.clone());
         entry.or_insert_with(|| Rc::new(Node::new(kind, payload)))
