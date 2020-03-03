@@ -4,13 +4,13 @@ use std::rc::Rc;
 pub mod kind;
 pub use kind::Kind;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug, Hash)]
 pub struct Node {
     kind: Kind,
     payload: Payload,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub enum Payload {
     None,
     Text(String),

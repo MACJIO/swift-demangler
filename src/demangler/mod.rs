@@ -5,6 +5,8 @@ use crate::punycode;
 use crate::util;
 use crate::error::{Error, ErrorKind};
 
+pub mod cache;
+
 #[cfg(test)]
 mod tests;
 
@@ -249,7 +251,7 @@ impl Demangler<'_> {
             )
         }).and_then(|node| {
             if let Kind::Identifier = node.kind() {
-                Ok(create_node(Kind::Module, (*node.payload()).clone()))
+                Ok(create_node(Kind::Module, node.payload().clone()))
             } else if let Kind::Module = node.kind() {
                 Ok(node)
             } else {
