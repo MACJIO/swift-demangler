@@ -6,6 +6,8 @@ use crate::util;
 use crate::error::{Error, ErrorKind};
 use crate::node::kind::{is_context, is_decl_name};
 
+pub mod cache;
+
 #[cfg(test)]
 mod tests;
 
