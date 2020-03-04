@@ -4,6 +4,7 @@ use crate::node::{kind, Node, Kind, Payload};
 use crate::punycode;
 use crate::util;
 use crate::error::{Error, ErrorKind};
+use crate::node::kind::{is_context, is_decl_name};
 
 #[cfg(test)]
 mod tests;
@@ -192,38 +193,41 @@ impl Demangler<'_> {
     }
 
     /// Pops a node from the node stack.
-    pub fn pop_node(&mut self) -> Option<Rc<Node>> {
-        self.node_stack.pop()
+    pub fn pop_node(&mut self) -> Result<Rc<Node>, Error> {
+        self.node_stack.pop().ok_or_else(|| {
+            Error::new(
+                ErrorKind::MissingNode,
+                "Expected a node.".to_string()
+            )
+        })
     }
 
     /// Pops a node from the node stack if the last node has a specific kind.
     pub fn pop_node_of_kind(&mut self, kind: Kind) -> Result<Rc<Node>, Error> {
-        if let Some(node) = self.node_stack.last() {
+        self.pop_node().and_then(|node| {
             if kind == node.kind() {
-                Ok(self.node_stack.pop().unwrap())
+                Ok(node)
             } else {
                 Err(Error::new(
                     ErrorKind::UnexpectedNodeKind,
                     format!("Unexpected node kind.")
                 ))
             }
-        } else {
-            Err(Error::new(
-                ErrorKind::MissingNode,
-                format!("Expected a node.")
-            ))
-        }
+        })
     }
 
     pub fn pop_type_and_get_child(&mut self) -> Result<Rc<Node>, Error> {
         let ty = self.pop_node_of_kind(Kind::Type)?;
 
-        if let Some(child) = ty.get_child(0) {
-            Ok(child)
+        if ty.num_children() == 1 {
+            Ok(ty.get_child(0).unwrap())
         } else {
+            // put the node back
+            self.push_node(ty);
+
             Err(Error::new(
                 ErrorKind::MissingChildNode,
-                "A Type node must have a child.".to_string()
+                "A Type node must have exactly one child.".to_string()
             ))
         }
     }
@@ -242,21 +246,43 @@ impl Demangler<'_> {
     }
 
     pub fn pop_module(&mut self) -> Result<Rc<Node>, Error> {
-        self.pop_node().ok_or_else(|| {
-            Error::new(
-                ErrorKind::MissingNode,
-                "Expected a node.".to_string()
-            )
-        }).and_then(|node| {
+        self.pop_node().and_then(|node| {
             if let Kind::Identifier = node.kind() {
                 Ok(create_node(Kind::Module, (*node.payload()).clone()))
             } else if let Kind::Module = node.kind() {
                 Ok(node)
             } else {
+                // put the node back where it was if we're not going to use it
+                self.push_node(node);
+
                 Err(Error::new(
                     ErrorKind::UnexpectedNodeKind,
                     "Expected an Identifier or a Module node.".to_string()
                 ))
+            }
+        })
+    }
+
+    pub fn pop_context(&mut self) -> Result<Rc<Node>, Error> {
+        self.pop_module().or_else(|e| {
+            if e.kind() == ErrorKind::UnexpectedNodeKind {
+                let child = self.pop_type_and_get_child()
+                    .or_else(|_| self.pop_node())?;
+
+                // check that the node is a context node
+                if is_context(child.kind()) {
+                    Ok(child)
+                } else {
+                    // put the node back if we didn't want it
+                    self.push_node(child);
+
+                    Err(Error::new(
+                        ErrorKind::UnexpectedNodeKind,
+                        "Expected a context child node.".to_string()
+                    ))
+                }
+            } else {
+                Err(e)
             }
         })
     }
@@ -633,6 +659,29 @@ impl Demangler<'_> {
                 Ok(subst_node)
             }
         }
+    }
+
+    pub fn demangle_any_generic_type(&mut self, kind: Kind) -> Result<Rc<Node>, Error> {
+        let name = self.pop_node()?;
+        if !is_decl_name(name.kind()) {
+            self.push_node(name);
+            return Err(Error::new(
+                ErrorKind::UnexpectedNodeKind,
+                "Expected a decl name node.".to_string()
+            ));
+        }
+
+        let ctx = self.pop_context().or_else(|err| {
+            self.push_node(name);
+            Err(err)
+        })?;
+
+        let node = create_type_node(
+            create_node_with_children(kind, vec![ctx, name])
+        );
+        self.substitutions.push(ctx.clone());
+
+        Ok(node)
     }
 
     #[cfg(test)]
