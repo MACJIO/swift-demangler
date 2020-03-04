@@ -28,4 +28,12 @@ impl Error {
             message
         }
     }
+
+    pub fn kind(&self) -> ErrorKind {
+        self.kind
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
 }
