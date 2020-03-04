@@ -248,7 +248,7 @@ impl Demangler<'_> {
     pub fn pop_module(&mut self) -> Result<Rc<Node>, Error> {
         self.pop_node().and_then(|node| {
             if let Kind::Identifier = node.kind() {
-                Ok(create_node(Kind::Module, (*node.payload()).clone()))
+                Ok(create_node(Kind::Module, node.payload().clone()))
             } else if let Kind::Module = node.kind() {
                 Ok(node)
             } else {
@@ -672,16 +672,32 @@ impl Demangler<'_> {
         }
 
         let ctx = self.pop_context().or_else(|err| {
-            self.push_node(name);
+            self.push_node(name.clone());
             Err(err)
         })?;
 
         let node = create_type_node(
             create_node_with_children(kind, vec![ctx, name])
         );
-        self.substitutions.push(ctx.clone());
+        self.substitutions.push(node.clone());
 
         Ok(node)
+    }
+
+    pub fn demangle_extension_context(&mut self) -> Result<Rc<Node>, Error> {
+        let gen_sig = self.pop_node_of_kind(Kind::DependentGenericSignature);
+        let module = self.pop_module()?;
+        let ty = self.pop_type_and_get_any_generic()?;
+
+        let children = if let Err(Error {kind: ErrorKind::UnexpectedNodeKind, ..}) = gen_sig {
+            vec![module, ty]
+        } else if let Ok(gen_sig) = gen_sig {
+            vec![module, ty, gen_sig]
+        } else {
+            return gen_sig
+        };
+
+        Ok(create_node_with_children(Kind::Extension, children))
     }
 
     #[cfg(test)]

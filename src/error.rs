@@ -1,4 +1,4 @@
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ErrorKind {
     UnexpectedEndOfName,
     UnexpectedCharacter,
@@ -15,9 +15,9 @@ pub enum ErrorKind {
     InvalidStandardSubst,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
-    kind: ErrorKind,
+    pub kind: ErrorKind,
     message: String,
 }
 
