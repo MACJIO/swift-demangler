@@ -10,9 +10,11 @@ pub enum ErrorKind {
     IntegerOverflow,
     InvalidIndexMangling,
     UnexpectedNodeKind,
+    UnexpectedNodePayload,
     MissingNode,
     MissingChildNode,
     InvalidStandardSubst,
+    InvalidBuiltinTypeSize,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
