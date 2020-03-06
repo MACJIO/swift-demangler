@@ -817,8 +817,7 @@ impl Demangler<'_> {
     }
 
     pub fn demangle_operator(&mut self) -> Result<Rc<Node>, Error> {
-        let c = self.next_char_skip_padding();
-        if let Some(c) = c {
+        if let Some(c) = self.next_char_skip_padding() {
             match c as char {
                 '\x01'..='\x0C' => unimplemented!("Symbolic references are not implemented."),
                 'A' => self.demangle_multi_substitutions(),
@@ -905,13 +904,25 @@ impl Demangler<'_> {
                             "Invalid suffix".to_string()
                         ))
                     })?);
+                    self.position = self.buffer.len();
                     Ok(node)
                 }
-                _ => Err(Error::new(ErrorKind::InvalidOperator, format!("Invalid operator {}", c)))
+                _ => {
+                    self.push_back();
+                    self.demangle_identifier()
+                }
             }
         } else {
             Err(Error::new(ErrorKind::UnexpectedEndOfName, "".to_string()))
         }
+    }
+
+    pub fn parse_and_push_nodes(&mut self) -> Result<(), Error> {
+        while self.position < self.buffer.len() {
+            let node = self.demangle_operator()?;
+            self.push_node(node);
+        }
+        Ok(())
     }
 
     #[cfg(test)]
