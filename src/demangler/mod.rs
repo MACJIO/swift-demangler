@@ -772,6 +772,13 @@ impl Demangler<'_> {
 
     }
 
+    pub fn demangle_generic_type(&mut self) -> Result<Rc<Node>, Error> {
+        let gen_sig = self.pop_node_of_kind(Kind::DependentGenericSignature)?;
+        let ty = self.pop_node_of_kind(Kind::Type)?;
+        let node = self.cache.create_node_with_children(Kind::DependentGenericType, vec![gen_sig, ty]);
+        Ok(self.cache.create_type_node(node))
+    }
+
     pub fn demangle_operator(&mut self) -> Result<Rc<Node>, Error> {
         let mut c = self.next_char_skip_padding();
         if let Some(c) = c {
