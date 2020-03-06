@@ -169,6 +169,21 @@ impl Demangler<'_> {
         self.position -= 1;
     }
 
+    pub fn add_subst(&mut self, subst: Rc<Node>) {
+        self.substitutions.push(subst);
+    }
+
+    pub fn get_subst(&mut self, idx: usize) -> Result<Rc<Node>, Error> {
+        self.substitutions.get(idx)
+            .and_then(|r| Some(r.clone()))
+            .ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidSubstIndex,
+                format!("Invalid substitution index {}", idx)
+            )
+        })
+    }
+
     /// Pushes a node onto the node stack.
     pub fn push_node(&mut self, node: Rc<Node>) {
         self.node_stack.push(node)
@@ -765,11 +780,6 @@ impl Demangler<'_> {
     #[cfg(test)]
     pub fn words(&mut self) -> &Vec<String> {
         &self.words
-    }
-
-    #[cfg(test)]
-    pub fn add_subst(&mut self, subst: Rc<Node>) {
-        self.substitutions.push(subst);
     }
 
     #[cfg(test)]
