@@ -88,6 +88,33 @@ fn create_standard_substitution(cache: &mut NodeCache, c: char) -> Option<Rc<Nod
     Some(node)
 }
 
+pub enum ValueWitnessKind {
+    AllocateBuffer = 0,
+    AssignWithCopy,
+    AssignWithTake,
+    DeallocateBuffer,
+    Destroy,
+    DestroyBuffer,
+    DestroyArray,
+    InitializeBufferWithCopyOfBuffer,
+    InitializeBufferWithCopy,
+    InitializeWithCopy,
+    InitializeBufferWithTake,
+    InitializeWithTake,
+    ProjectBuffer,
+    InitializeBufferWithTakeOfBuffer,
+    InitializeArrayWithCopy,
+    InitializeArrayWithTakeFrontToBack,
+    InitializeArrayWithTakeBackToFront,
+    StoreExtraInhabitant,
+    GetExtraInhabitantIndex,
+    GetEnumTag,
+    DestructiveProjectEnumData,
+    DestructiveInjectEnumTag,
+    GetEnumTagSinglePayload,
+    StoreEnumTagSinglePayload,
+}
+
 pub struct Demangler<'a> {
     buffer: &'a [u8],
     position: usize,
@@ -131,6 +158,17 @@ impl Demangler<'_> {
         let position = self.position;
         if position < buffer.len() {
             Some(buffer[position])
+        } else {
+            None
+        }
+    }
+
+    pub fn next_bytes(&mut self, len: usize) -> Option<&[u8]> {
+        let position = self.position;
+        let bytes_avail = self.buffer.len() - self.position;
+        if bytes_avail >= len {
+            self.position = position + len;
+            Some(&self.buffer[position..self.position])
         } else {
             None
         }
@@ -814,6 +852,51 @@ impl Demangler<'_> {
         }
 
         Ok(self.demangle_decl_name()?)
+    }
+
+    pub fn demangle_value_witness(&mut self) -> Result<Rc<Node>, Error> {
+        if let Some(name) = self.next_bytes(2) {
+            let kind = match name {
+                b"al" => ValueWitnessKind::AllocateBuffer,
+                b"ca" => ValueWitnessKind::AssignWithCopy,
+                b"ta" => ValueWitnessKind::AssignWithTake,
+                b"de" => ValueWitnessKind::DeallocateBuffer,
+                b"xx" => ValueWitnessKind::Destroy,
+                b"XX" => ValueWitnessKind::DestroyBuffer,
+                b"Xx" => ValueWitnessKind::DestroyArray,
+                b"CP" => ValueWitnessKind::InitializeBufferWithCopyOfBuffer,
+                b"Cp" => ValueWitnessKind::InitializeBufferWithCopy,
+                b"cp" => ValueWitnessKind::InitializeWithCopy,
+                b"Tk" => ValueWitnessKind::InitializeBufferWithTake,
+                b"tk" => ValueWitnessKind::InitializeWithTake,
+                b"pr" => ValueWitnessKind::ProjectBuffer,
+                b"TK" => ValueWitnessKind::InitializeBufferWithTakeOfBuffer,
+                b"Cc" => ValueWitnessKind::InitializeArrayWithCopy,
+                b"Tt" => ValueWitnessKind::InitializeArrayWithTakeFrontToBack,
+                b"tT" => ValueWitnessKind::InitializeArrayWithTakeBackToFront,
+                b"xs" => ValueWitnessKind::StoreExtraInhabitant,
+                b"xg" => ValueWitnessKind::GetExtraInhabitantIndex,
+                b"ug" => ValueWitnessKind::GetEnumTag,
+                b"up" => ValueWitnessKind::DestructiveProjectEnumData,
+                b"ui" => ValueWitnessKind::DestructiveInjectEnumTag,
+                b"et" => ValueWitnessKind::GetEnumTagSinglePayload,
+                b"st" => ValueWitnessKind::StoreEnumTagSinglePayload,
+                _ => return Err(Error::new(
+                    ErrorKind::UnexpectedCharacter,
+                    format!("Expected witness name at position {}.", self.position)
+                ))
+            };
+            let idx_node = self.cache.create_index_node(Kind::Index, kind as u64);
+            let ty = self.pop_node_of_kind(Kind::Type)?;
+            Ok(self.cache.create_node_with_children(Kind::ValueWitness, vec![
+                idx_node, ty
+            ]))
+        } else {
+            Err(Error::new(
+                ErrorKind::UnexpectedEndOfName,
+                format!("Expected to characters at position {}.", self.position)
+            ))
+        }
     }
 
     pub fn demangle_operator(&mut self) -> Result<Rc<Node>, Error> {
