@@ -4,7 +4,7 @@ use std::rc::Rc;
 use enum_map::{self, EnumMap};
 
 use crate::node::{Node, Kind, Payload};
-use crate::demangler::{STDLIB_NAME, create_type_node, create_node_with_children};
+use crate::demangler::STDLIB_NAME;
 
 pub struct NodeCacheIterator<'a> {
     outer_iter: enum_map::Values<'a, HashMap<Payload, Rc<Node>>>,
@@ -215,15 +215,10 @@ impl NodeCache {
     }
 
     pub fn create_swift_type(&mut self, kind: Kind, name: String) -> Rc<Node> {
-        create_type_node(
-            create_node_with_children(
-                kind,
-                vec![
-                    self.create_module_node(STDLIB_NAME.to_string()),
-                    self.create_ident_node(name)
-                ]
-            )
-        )
+        let module = self.create_module_node(STDLIB_NAME.to_string());
+        let name = self.create_ident_node(name);
+        let ty = self.create_node_with_children(kind,vec![module, name]);
+        self.create_type_node(ty)
     }
 
     /// Returns an iterator over all currently cached nodes. This function mainly exists for tests

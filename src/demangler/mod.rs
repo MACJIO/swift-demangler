@@ -7,6 +7,7 @@ use crate::error::{Error, ErrorKind};
 use crate::node::kind::{is_context, is_decl_name};
 
 pub mod cache;
+use cache::NodeCache;
 
 #[cfg(test)]
 mod tests;
@@ -28,97 +29,63 @@ const BUILTIN_TYPE_NAME_RAWPOINTER: &str = "Builtin.RawPointer";
 const BUILTIN_TYPE_NAME_SILTOKEN: &str = "Builtin.SILToken";
 const BUILTIN_TYPE_NAME_WORD: &str = "Builtin.Word";
 
-fn create_node(kind: Kind, payload: Payload) -> Rc<Node> {
-    Rc::new(Node::new(kind, payload))
-}
+fn create_standard_substitution(cache: &mut NodeCache, c: char) -> Option<Rc<Node>> {
+    let node = match c {
+        'A' => cache.create_swift_type(Kind::Structure, "AutoreleasingUnsafeMutablePointer".to_string()),
+        'a' => cache.create_swift_type(Kind::Structure, "Array".to_string()),
+        'b' => cache.create_swift_type(Kind::Structure, "Bool".to_string()),
+        'D' => cache.create_swift_type(Kind::Structure, "Dictionary".to_string()),
+        'd' => cache.create_swift_type(Kind::Structure, "Double".to_string()),
+        'f' => cache.create_swift_type(Kind::Structure, "Float".to_string()),
+        'h' => cache.create_swift_type(Kind::Structure, "Set".to_string()),
+        'I' => cache.create_swift_type(Kind::Structure, "DefaultIndices".to_string()),
+        'i' => cache.create_swift_type(Kind::Structure, "Int".to_string()),
+        'J' => cache.create_swift_type(Kind::Structure, "Character".to_string()),
+        'N' => cache.create_swift_type(Kind::Structure, "ClosedRange".to_string()),
+        'n' => cache.create_swift_type(Kind::Structure, "Range".to_string()),
+        'O' => cache.create_swift_type(Kind::Structure, "ObjectIdentifier".to_string()),
+        'P' => cache.create_swift_type(Kind::Structure, "UnsafePointer".to_string()),
+        'p' => cache.create_swift_type(Kind::Structure, "UnsafeMutablePointer".to_string()),
+        'R' => cache.create_swift_type(Kind::Structure, "UnsafeBufferPointer".to_string()),
+        'r' => cache.create_swift_type(Kind::Structure, "UnsafeMutableBufferPointer".to_string()),
+        'S' => cache.create_swift_type(Kind::Structure, "String".to_string()),
+        's' => cache.create_swift_type(Kind::Structure, "Substring".to_string()),
+        'u' => cache.create_swift_type(Kind::Structure, "UInt".to_string()),
+        'V' => cache.create_swift_type(Kind::Structure, "UnsafeRawPointer".to_string()),
+        'v' => cache.create_swift_type(Kind::Structure, "UnsafeMutableRawPointer".to_string()),
+        'W' => cache.create_swift_type(Kind::Structure, "UnsafeRawBufferPointer".to_string()),
+        'w' => cache.create_swift_type(Kind::Structure, "UnsafeMutableRawBufferPointer".to_string()),
 
-fn create_text_node(kind: Kind, text: String) -> Rc<Node> {
-    Rc::new(Node::new(kind, Payload::Text(text)))
-}
+        'q' => cache.create_swift_type(Kind::Enum, "Optional".to_string()),
 
-fn create_index_node(kind: Kind, index: u64) -> Rc<Node> {
-    Rc::new(Node::new(kind, Payload::Index(index)))
-}
-
-fn create_node_with_child(kind: Kind, child: Rc<Node>) -> Rc<Node> {
-    Rc::new(Node::new(kind, Payload::Children(vec![child])))
-}
-
-fn create_node_with_children(kind: Kind, children: Vec<Rc<Node>>) -> Rc<Node> {
-    Rc::new(Node::new(kind, Payload::Children(children)))
-}
-
-fn create_type_node(inner_node: Rc<Node>) -> Rc<Node> {
-    create_node_with_children(Kind::Type, vec![inner_node])
-}
-
-fn create_swift_type(type_kind: Kind, name: String) -> Rc<Node> {
-    create_type_node(
-        create_node_with_children(
-            type_kind,
-            vec![
-                create_text_node(Kind::Module, STDLIB_NAME.to_string()),
-                create_text_node(Kind::Identifier, name)
-            ]
-        )
-    )
-}
-
-fn create_standard_substitution(c: char) -> Option<Rc<Node>> {
-    Some (match c {
-        'A' => create_swift_type(Kind::Structure, "AutoreleasingUnsafeMutablePointer".to_string()),
-        'a' => create_swift_type(Kind::Structure, "Array".to_string()),
-        'b' => create_swift_type(Kind::Structure, "Bool".to_string()),
-        'D' => create_swift_type(Kind::Structure, "Dictionary".to_string()),
-        'd' => create_swift_type(Kind::Structure, "Double".to_string()),
-        'f' => create_swift_type(Kind::Structure, "Float".to_string()),
-        'h' => create_swift_type(Kind::Structure, "Set".to_string()),
-        'I' => create_swift_type(Kind::Structure, "DefaultIndices".to_string()),
-        'i' => create_swift_type(Kind::Structure, "Int".to_string()),
-        'J' => create_swift_type(Kind::Structure, "Character".to_string()),
-        'N' => create_swift_type(Kind::Structure, "ClosedRange".to_string()),
-        'n' => create_swift_type(Kind::Structure, "Range".to_string()),
-        'O' => create_swift_type(Kind::Structure, "ObjectIdentifier".to_string()),
-        'P' => create_swift_type(Kind::Structure, "UnsafePointer".to_string()),
-        'p' => create_swift_type(Kind::Structure, "UnsafeMutablePointer".to_string()),
-        'R' => create_swift_type(Kind::Structure, "UnsafeBufferPointer".to_string()),
-        'r' => create_swift_type(Kind::Structure, "UnsafeMutableBufferPointer".to_string()),
-        'S' => create_swift_type(Kind::Structure, "String".to_string()),
-        's' => create_swift_type(Kind::Structure, "Substring".to_string()),
-        'u' => create_swift_type(Kind::Structure, "UInt".to_string()),
-        'V' => create_swift_type(Kind::Structure, "UnsafeRawPointer".to_string()),
-        'v' => create_swift_type(Kind::Structure, "UnsafeMutableRawPointer".to_string()),
-        'W' => create_swift_type(Kind::Structure, "UnsafeRawBufferPointer".to_string()),
-        'w' => create_swift_type(Kind::Structure, "UnsafeMutableRawBufferPointer".to_string()),
-
-        'q' => create_swift_type(Kind::Enum, "Optional".to_string()),
-
-        'B' => create_swift_type(Kind::Protocol, "BinaryFloatingPoint".to_string()),
-        'E' => create_swift_type(Kind::Protocol, "Encodable".to_string()),
-        'e' => create_swift_type(Kind::Protocol, "Decodable".to_string()),
-        'F' => create_swift_type(Kind::Protocol, "FloatingPoint".to_string()),
-        'G' => create_swift_type(Kind::Protocol, "RandomNumberGenerator".to_string()),
-        'H' => create_swift_type(Kind::Protocol, "Hashable".to_string()),
-        'j' => create_swift_type(Kind::Protocol, "Numeric".to_string()),
-        'K' => create_swift_type(Kind::Protocol, "BidirectionalCollection".to_string()),
-        'k' => create_swift_type(Kind::Protocol, "RandomAccessCollection".to_string()),
-        'L' => create_swift_type(Kind::Protocol, "Comparable".to_string()),
-        'l' => create_swift_type(Kind::Protocol, "Collection".to_string()),
-        'M' => create_swift_type(Kind::Protocol, "MutableCollection".to_string()),
-        'm' => create_swift_type(Kind::Protocol, "RangeReplaceableCollection".to_string()),
-        'Q' => create_swift_type(Kind::Protocol, "Equatable".to_string()),
-        'T' => create_swift_type(Kind::Protocol, "Sequence".to_string()),
-        't' => create_swift_type(Kind::Protocol, "IteratorProtocol".to_string()),
-        'U' => create_swift_type(Kind::Protocol, "UnsignedInteger".to_string()),
-        'X' => create_swift_type(Kind::Protocol, "RangeExpression".to_string()),
-        'x' => create_swift_type(Kind::Protocol, "Strideable".to_string()),
-        'Y' => create_swift_type(Kind::Protocol, "RawRepresentable".to_string()),
-        'y' => create_swift_type(Kind::Protocol, "StringProtocol".to_string()),
-        'Z' => create_swift_type(Kind::Protocol, "SignedInteger".to_string()),
-        'z' => create_swift_type(Kind::Protocol, "BinaryInteger".to_string()),
+        'B' => cache.create_swift_type(Kind::Protocol, "BinaryFloatingPoint".to_string()),
+        'E' => cache.create_swift_type(Kind::Protocol, "Encodable".to_string()),
+        'e' => cache.create_swift_type(Kind::Protocol, "Decodable".to_string()),
+        'F' => cache.create_swift_type(Kind::Protocol, "FloatingPoint".to_string()),
+        'G' => cache.create_swift_type(Kind::Protocol, "RandomNumberGenerator".to_string()),
+        'H' => cache.create_swift_type(Kind::Protocol, "Hashable".to_string()),
+        'j' => cache.create_swift_type(Kind::Protocol, "Numeric".to_string()),
+        'K' => cache.create_swift_type(Kind::Protocol, "BidirectionalCollection".to_string()),
+        'k' => cache.create_swift_type(Kind::Protocol, "RandomAccessCollection".to_string()),
+        'L' => cache.create_swift_type(Kind::Protocol, "Comparable".to_string()),
+        'l' => cache.create_swift_type(Kind::Protocol, "Collection".to_string()),
+        'M' => cache.create_swift_type(Kind::Protocol, "MutableCollection".to_string()),
+        'm' => cache.create_swift_type(Kind::Protocol, "RangeReplaceableCollection".to_string()),
+        'Q' => cache.create_swift_type(Kind::Protocol, "Equatable".to_string()),
+        'T' => cache.create_swift_type(Kind::Protocol, "Sequence".to_string()),
+        't' => cache.create_swift_type(Kind::Protocol, "IteratorProtocol".to_string()),
+        'U' => cache.create_swift_type(Kind::Protocol, "UnsignedInteger".to_string()),
+        'X' => cache.create_swift_type(Kind::Protocol, "RangeExpression".to_string()),
+        'x' => cache.create_swift_type(Kind::Protocol, "Strideable".to_string()),
+        'Y' => cache.create_swift_type(Kind::Protocol, "RawRepresentable".to_string()),
+        'y' => cache.create_swift_type(Kind::Protocol, "StringProtocol".to_string()),
+        'Z' => cache.create_swift_type(Kind::Protocol, "SignedInteger".to_string()),
+        'z' => cache.create_swift_type(Kind::Protocol, "BinaryInteger".to_string()),
 
         _ => return None
-    })
+    };
+
+    Some(node)
 }
 
 pub struct Demangler<'a> {
@@ -126,6 +93,7 @@ pub struct Demangler<'a> {
     position: usize,
     address: usize,
     node_stack: Vec<Rc<Node>>,
+    cache: NodeCache,
     words: Vec<String>,
     substitutions: Vec<Rc<Node>>,
 }
@@ -141,6 +109,7 @@ impl Demangler<'_> {
             position: 0,
             address,
             node_stack: Vec::new(),
+            cache: NodeCache::new(),
             words: Vec::new(),
             substitutions: Vec::new()
         }
@@ -261,7 +230,7 @@ impl Demangler<'_> {
     pub fn pop_module(&mut self) -> Result<Rc<Node>, Error> {
         self.pop_node().and_then(|node| {
             if let Kind::Identifier = node.kind() {
-                Ok(create_node(Kind::Module, node.payload().clone()))
+                Ok(self.cache.create_node(Kind::Module, node.payload().clone()))
             } else if let Kind::Module = node.kind() {
                 Ok(node)
             } else {
@@ -385,7 +354,8 @@ impl Demangler<'_> {
     }
 
     pub fn demangle_index_as_node(&mut self) -> Result<Rc<Node>, Error> {
-        Ok(create_index_node(Kind::Index, self.demangle_index()? as u64))
+        let index = self.demangle_index()? as u64;
+        Ok(self.cache.create_index_node(Kind::Index, index))
     }
 
     /// Demangles a word substitution at current position. Returns a tuple, where the first element
@@ -627,21 +597,17 @@ impl Demangler<'_> {
         })? as char;
 
         match c {
-            'o' => Ok(create_text_node(Kind::Module, MANGLING_MODULE_OBJC.to_string())),
-            'C' => Ok(create_text_node(Kind::Module, MANGLING_MODULE_CLANG_IMPORTER.to_string())),
+            'o' => Ok(self.cache.create_module_node(MANGLING_MODULE_OBJC.to_string())),
+            'C' => Ok(self.cache.create_module_node(MANGLING_MODULE_CLANG_IMPORTER.to_string())),
             'g' => {
-                let optional_ty = create_type_node(
-                    create_node_with_children(
-                        Kind::BoundGenericEnum,
-                        vec![
-                            create_swift_type(Kind::Enum, "Optional".to_string()),
-                            create_node_with_child(
-                                Kind::TypeList,
-                                self.pop_node_of_kind(Kind::Type)?
-                            )
-                        ]
-                    )
-                );
+                let child = self.pop_node_of_kind(Kind::Type)?;
+                let type_list = self.cache.create_node_with_child(Kind::TypeList, child);
+                let children = vec![
+                    self.cache.create_swift_type(Kind::Enum, "Optional".to_string()),
+                    type_list
+                ];
+                let inner_ty = self.cache.create_node_with_children(Kind::BoundGenericEnum, children);
+                let optional_ty = self.cache.create_type_node(inner_ty);
                 self.substitutions.push(optional_ty.clone());
                 Ok(optional_ty)
             },
@@ -658,7 +624,7 @@ impl Demangler<'_> {
                 // so we need to call them separately here.
                 let c = self.next_char();
                 let c = self.char_or_err(c)? as char;
-                let subst_node = create_standard_substitution(c)
+                let subst_node = create_standard_substitution(&mut self.cache, c)
                     .ok_or_else(|| {
                         Error::new(
                             ErrorKind::InvalidStandardSubst,
@@ -693,9 +659,8 @@ impl Demangler<'_> {
             Err(err)
         })?;
 
-        let node = create_type_node(
-            create_node_with_children(kind, vec![ctx, name])
-        );
+        let ty = self.cache.create_node_with_children(kind, vec![ctx, name]);
+        let node = self.cache.create_type_node(ty);
         self.substitutions.push(node.clone());
 
         Ok(node)
@@ -714,7 +679,7 @@ impl Demangler<'_> {
             return gen_sig
         };
 
-        Ok(create_node_with_children(Kind::Extension, children))
+        Ok(self.cache.create_node_with_children(Kind::Extension, children))
     }
 
     pub fn demangle_builtin_type_size(&mut self) -> Result<u32, Error> {
@@ -732,17 +697,23 @@ impl Demangler<'_> {
     pub fn demangle_builtin_type(&mut self) -> Result<Rc<Node>, Error> {
         if let Some(c) = self.next_char() {
             let node = match c as char {
-                'b' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_BRIDGEOBJECT.to_string()),
-                'B' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER.to_string()),
-                'f' => create_text_node(
-                    Kind::BuiltinTypeName,
-                    BUILTIN_TYPE_NAME_FLOAT.to_string() + &format!("{}", self.demangle_builtin_type_size()?)
-                ),
-                'i' => create_text_node(
-                    Kind::BuiltinTypeName,
-                    BUILTIN_TYPE_NAME_INT.to_string() + &format!("{}", self.demangle_builtin_type_size()?)
-                ),
-                'I' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_INTLITERAL.to_string()),
+                'b' => self.cache.create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_BRIDGEOBJECT.to_string()),
+                'B' => self.cache.create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER.to_string()),
+                'f' => {
+                    let size = self.demangle_builtin_type_size()?;
+                    self.cache.create_text_node(
+                        Kind::BuiltinTypeName,
+                        BUILTIN_TYPE_NAME_FLOAT.to_string() + &format!("{}", size)
+                    )
+                },
+                'i' => {
+                    let size = self.demangle_builtin_type_size()?;
+                    self.cache.create_text_node(
+                        Kind::BuiltinTypeName,
+                        BUILTIN_TYPE_NAME_INT.to_string() + &format!("{}", size)
+                    )
+                },
+                'I' => self.cache.create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_INTLITERAL.to_string()),
                 'v' => {
                     let elts = self.demangle_builtin_type_size()?;
                     let elt_type = self.pop_type_and_get_child()?;
@@ -757,7 +728,7 @@ impl Demangler<'_> {
                             &format!("{}", elts) +
                             "x" +
                             &text[BUILTIN_TYPE_NAME_PREFIX.len()..];
-                        create_text_node(Kind::BuiltinTypeName, name)
+                        self.cache.create_text_node(Kind::BuiltinTypeName, name)
                     } else {
                         return Err(Error::new(
                             ErrorKind::UnexpectedNodePayload,
@@ -765,18 +736,18 @@ impl Demangler<'_> {
                         ))
                     }
                 },
-                'O' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_UNKNOWNOBJECT.to_string()),
-                'o' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_NATIVEOBJECT.to_string()),
-                'p' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_RAWPOINTER.to_string()),
-                't' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_SILTOKEN.to_string()),
-                'w' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_WORD.to_string()),
+                'O' => self.cache.create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_UNKNOWNOBJECT.to_string()),
+                'o' => self.cache.create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_NATIVEOBJECT.to_string()),
+                'p' => self.cache.create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_RAWPOINTER.to_string()),
+                't' => self.cache.create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_SILTOKEN.to_string()),
+                'w' => self.cache.create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_WORD.to_string()),
                 _ => return Err(Error::new(
                     ErrorKind::UnexpectedCharacter,
                     format!("Unexpected builtin type {} at position {}.", c, self.position)
                 )),
             };
 
-            Ok(create_type_node(node))
+            Ok(self.cache.create_type_node(node))
         } else {
             Err(Error::new(
                 ErrorKind::UnexpectedEndOfName,

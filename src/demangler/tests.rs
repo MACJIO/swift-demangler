@@ -298,5 +298,5 @@ fn test_demangle_standard_substitution_known_type() {
             panic!("{:?}", e);
         });
 
-    assert_eq!(node, create_swift_type(Kind::Structure, "UInt".to_string()))
+    assert_eq!(node, dem.cache.create_swift_type(Kind::Structure, "UInt".to_string()))
 }
