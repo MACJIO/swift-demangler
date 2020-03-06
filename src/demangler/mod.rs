@@ -772,6 +772,104 @@ impl Demangler<'_> {
 
     }
 
+    pub fn demangle_operator(&mut self) -> Result<Rc<Node>, Error> {
+        let mut c = self.next_char_skip_padding();
+        if let Some(c) = c {
+            match c as char {
+                '\x01'..='\x0C' => unimplemented!("Symbolic references are not implemented."),
+                'A' => self.demangle_multi_substitutions(),
+                'B' => self.demangle_builtin_type(),
+                'C' => self.demangle_any_generic_type(Kind::Class),
+                'D' => unimplemented!("Type mangling is not implemented."),
+                'E' => self.demangle_extension_context(),
+                'F' => unimplemented!("Plain functions are not supported."),
+                'G' => unimplemented!("Bound generic types are not supported"),
+                'H' => unimplemented!("H operator is not supported"),
+                'I' => unimplemented!("demangleImplFunctionType() is not implemented."),
+                'K' => Ok(self.cache.create_none_node(Kind::ThrowsAnnotation)),
+                'L' => unimplemented!("demangleLocalIdentifier() is not implemented."),
+                'M' => unimplemented!("demangleMetatype() is not implemented."),
+                'N' => {
+                    let node = self.pop_node()?;
+                    Ok(self.cache.create_node_with_child(Kind::TypeMetadata, node))
+                },
+                'O' => self.demangle_any_generic_type(Kind::Enum),
+                'P' => self.demangle_any_generic_type(Kind::Protocol),
+                'Q' => unimplemented!("demangleArchetype() is not implemented."),
+                'R' => unimplemented!("demangleGenericRequirement() is not implemented."),
+                'S' => self.demangle_standard_substitution(),
+                'T' => unimplemented!("demangleThunkOrSpecialization() is not implemented."),
+                'V' => self.demangle_any_generic_type(Kind::Structure),
+                'W' => unimplemented!("demangleWitness() is not implemented."),
+                'X' => unimplemented!("demangleSpecialType() is not implemented."),
+                'Z' => {
+                    let node = self.pop_node()?;
+                    if kind::is_entity(node.kind()) {
+                        Ok(self.cache.create_node_with_child(Kind::Static, node))
+                    } else {
+                        Err(Error::new(
+                            ErrorKind::UnexpectedNodeKind,
+                            format!("Expected entity type at position {}.", self.position)
+                        ))
+                    }
+                },
+                'a' => self.demangle_any_generic_type(Kind::TypeAlias),
+                'c' => unimplemented!("popFunctionType() is not implemented."),
+                'd' => Ok(self.cache.create_none_node(Kind::VariadicMarker)),
+                'f' => unimplemented!("demangleFunctionEntity() is not implemented."),
+                'g' => unimplemented!("demangleRetroactiveConformance() is not implemented."),
+                'h' => {
+                    let child = self.pop_type_and_get_child()?;
+                    let node = self.cache.create_node_with_child(Kind::Shared, child);
+                    Ok(self.cache.create_type_node(node))
+                },
+                'i' => unimplemented!("demangleSubscript() is not implemented."),
+                'l' => unimplemented!("demangleGenericSignature() is not implemented."),
+                'm' => {
+                    let child = self.pop_node_of_kind(Kind::Type)?;
+                    let node = self.cache.create_node_with_child(Kind::Metatype, child);
+                    Ok(self.cache.create_type_node(node))
+                },
+                'n' => {
+                    let child = self.pop_type_and_get_child()?;
+                    let node = self.cache.create_node_with_child(Kind::Owned, child);
+                    Ok(self.cache.create_type_node(node))
+                },
+                'o' => unimplemented!("demangleOperatorIdentifier() is not implemented."),
+                'p' => unimplemented!("demangleProtocolListType() is not implemented."),
+                'q' => unimplemented!("createType(demangleGenericParamIndex()) is not implemented."),
+                'r' => unimplemented!("demangleGenericSignature() is not implemented."),
+                's' => Ok(self.cache.create_module_node(STDLIB_NAME.to_string())),
+                't' => unimplemented!("popTuple() is not implemented."),
+                'u' => unimplemented!("demangleGenericType() is not implemented."),
+                'v' => unimplemented!("demangleVariable() is not implemented."),
+                'w' => unimplemented!("demangleValueWitness() is not implemented."),
+                'x' => unimplemented!("createType(getDependentGenericParamType(0, 0)) is not implemented."),
+                'y' => Ok(self.cache.create_none_node(Kind::EmptyList)),
+                'z' => {
+                    let child = self.pop_type_and_get_child()?;
+                    let node = self.cache.create_node_with_child(Kind::InOut, child);
+                    Ok(self.cache.create_type_node(node))
+                },
+                '_' => Ok(self.cache.create_none_node(Kind::FirstElementMarker)),
+                '.' => {
+                    self.push_back();
+                    let suffix = self.buffer[self.position..].to_vec();
+                    let node = self.cache.create_text_node(Kind::Suffix, String::from_utf8(suffix).or_else(|_| {
+                        Err(Error::new(
+                            ErrorKind::UnexpectedCharacter,
+                            "Invalid suffix".to_string()
+                        ))
+                    })?);
+                    Ok(node)
+                }
+                _ => Err(Error::new(ErrorKind::InvalidOperator, format!("Invalid operator {}", c)))
+            }
+        } else {
+            Err(Error::new(ErrorKind::UnexpectedEndOfName, "".to_string()))
+        }
+    }
+
     #[cfg(test)]
     pub fn add_word_subst(&mut self, word: String) {
         self.words.push(word)
