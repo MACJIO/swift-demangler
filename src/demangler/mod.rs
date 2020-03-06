@@ -21,6 +21,12 @@ const BUILTIN_TYPE_NAME_FLOAT: &str = "Builtin.FPIEEE";
 const BUILTIN_TYPE_NAME_INT: &str = "Builtin.Int";
 const BUILTIN_TYPE_NAME_INTLITERAL: &str = "Builtin.IntLiteral";
 const BUILTIN_TYPE_NAME_PREFIX: &str = "Builtin.";
+const BUILTIN_TYPE_NAME_VEC: &str = "Builtin.Vec";
+const BUILTIN_TYPE_NAME_UNKNOWNOBJECT: &str = "Builtin.UnknownObject";
+const BUILTIN_TYPE_NAME_NATIVEOBJECT: &str = "Builtin.NativeObject";
+const BUILTIN_TYPE_NAME_RAWPOINTER: &str = "Builtin.RawPointer";
+const BUILTIN_TYPE_NAME_SILTOKEN: &str = "Builtin.SILToken";
+const BUILTIN_TYPE_NAME_WORD: &str = "Builtin.Word";
 
 fn create_node(kind: Kind, payload: Payload) -> Rc<Node> {
     Rc::new(Node::new(kind, payload))
@@ -123,6 +129,7 @@ pub struct Demangler<'a> {
 impl Demangler<'_> {
     const MAX_WORD_SUBSTS: usize = 26;
     const MAX_REPEAT_COUNT: u32 = 2048;
+    const MAX_BUILTIN_TYPE_SIZE: u32 = 4096;
 
     pub fn new(buffer: &[u8], address: usize) -> Demangler {
         Demangler {
@@ -700,6 +707,75 @@ impl Demangler<'_> {
         };
 
         Ok(create_node_with_children(Kind::Extension, children))
+    }
+
+    pub fn demangle_builtin_type_size(&mut self) -> Result<u32, Error> {
+        let size = self.demangle_index()? - 1;
+        if size > Demangler::MAX_BUILTIN_TYPE_SIZE {
+            Err(Error::new(
+                ErrorKind::InvalidBuiltinTypeSize,
+                format!("Invalid size {} at position {}.", size, self.position)
+            ))
+        } else {
+            Ok(size)
+        }
+    }
+
+    pub fn demangle_builtin_type(&mut self) -> Result<Rc<Node>, Error> {
+        if let Some(c) = self.next_char() {
+            let node = match c as char {
+                'b' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_BRIDGEOBJECT.to_string()),
+                'B' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER.to_string()),
+                'f' => create_text_node(
+                    Kind::BuiltinTypeName,
+                    BUILTIN_TYPE_NAME_FLOAT.to_string() + &format!("{}", self.demangle_builtin_type_size()?)
+                ),
+                'i' => create_text_node(
+                    Kind::BuiltinTypeName,
+                    BUILTIN_TYPE_NAME_INT.to_string() + &format!("{}", self.demangle_builtin_type_size()?)
+                ),
+                'I' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_INTLITERAL.to_string()),
+                'v' => {
+                    let elts = self.demangle_builtin_type_size()?;
+                    let elt_type = self.pop_type_and_get_child()?;
+                    if let Payload::Text(text) = elt_type.payload() {
+                        if elt_type.kind() != Kind::BuiltinTypeName || !text.starts_with(BUILTIN_TYPE_NAME_PREFIX) {
+                            return Err(Error::new(
+                                ErrorKind::UnexpectedNodeKind,
+                                format!("Expected builtin type node at position {}.", self.position)
+                            ))
+                        }
+                        let name = BUILTIN_TYPE_NAME_VEC.to_string() +
+                            &format!("{}", elts) +
+                            "x" +
+                            &text[BUILTIN_TYPE_NAME_PREFIX.len()..];
+                        create_text_node(Kind::BuiltinTypeName, name)
+                    } else {
+                        return Err(Error::new(
+                            ErrorKind::UnexpectedNodePayload,
+                            format!("Expected payload at position {}.", self.position)
+                        ))
+                    }
+                },
+                'O' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_UNKNOWNOBJECT.to_string()),
+                'o' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_NATIVEOBJECT.to_string()),
+                'p' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_RAWPOINTER.to_string()),
+                't' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_SILTOKEN.to_string()),
+                'w' => create_text_node(Kind::BuiltinTypeName, BUILTIN_TYPE_NAME_WORD.to_string()),
+                _ => return Err(Error::new(
+                    ErrorKind::UnexpectedCharacter,
+                    format!("Unexpected builtin type {} at position {}.", c, self.position)
+                )),
+            };
+
+            Ok(create_type_node(node))
+        } else {
+            Err(Error::new(
+                ErrorKind::UnexpectedEndOfName,
+                format!("Expected char at position {}.", self.position)
+            ))
+        }
+
     }
 
     #[cfg(test)]
