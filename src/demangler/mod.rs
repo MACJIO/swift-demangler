@@ -30,6 +30,10 @@ fn create_text_node(kind: Kind, text: String) -> Rc<Node> {
     Rc::new(Node::new(kind, Payload::Text(text)))
 }
 
+fn create_index_node(kind: Kind, index: u64) -> Rc<Node> {
+    Rc::new(Node::new(kind, Payload::Index(index)))
+}
+
 fn create_node_with_child(kind: Kind, child: Rc<Node>) -> Rc<Node> {
     Rc::new(Node::new(kind, Payload::Children(vec![child])))
 }
@@ -371,6 +375,10 @@ impl Demangler<'_> {
                 format!("Expected an index at position {}.", self.position)
             ))
         }
+    }
+
+    pub fn demangle_index_as_node(&mut self) -> Result<Rc<Node>, Error> {
+        Ok(create_index_node(Kind::Index, self.demangle_index()? as u64))
     }
 
     /// Demangles a word substitution at current position. Returns a tuple, where the first element
