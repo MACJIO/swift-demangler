@@ -320,3 +320,29 @@ fn test_demangle_any_generic_type() {
     println!("num children {}", gen.num_children());
     gen.get_child(0).unwrap().print();
 }
+
+#[test]
+fn test_demangle_operator_objc_class_name() {
+    let mut dem = Demangler::new(b"So28DZRDynamicPageViewControllerC", 0);
+    dem.parse_and_push_nodes().or_else(|e| -> Result<(), Error> {
+        panic!("{:?}", e)
+    });
+    let mut idx = 0;
+    while let Ok(node) = dem.pop_node() {
+        println!("#{} {:?}", idx, node);
+        idx += 1;
+    }
+}
+
+#[test]
+fn test_demangle_operator_objc_proto_name() {
+    let mut dem = Demangler::new(b"s25ExpressibleByArrayLiteralP.1337", 0);
+    dem.parse_and_push_nodes().or_else(|e| -> Result<(), Error> {
+        panic!("{:?}", e)
+    });
+    let mut idx = 0;
+    while let Ok(node) = dem.pop_node() {
+        println!("#{} {:?}", idx, node);
+        idx += 1;
+    }
+}
