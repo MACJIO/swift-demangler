@@ -779,8 +779,45 @@ impl Demangler<'_> {
         Ok(self.cache.create_type_node(node))
     }
 
+    pub fn demangle_decl_name(&mut self) -> Result<Rc<Node>, Error> {
+        let discriminator = self.demangle_index_as_node()?;
+        let name = self.pop_node()?;
+        if kind::is_decl_name(name.kind()) {
+            Ok(self.cache.create_node_with_children(Kind::PrivateDeclName, vec![discriminator, name]))
+        } else {
+            Err(Error::new(
+                ErrorKind::UnexpectedNodeKind,
+                "Expected decl kind.".to_string()
+            ))
+        }
+    }
+
+    pub fn demangle_local_identifier(&mut self) -> Result<Rc<Node>, Error> {
+        if let Some(true) = self.next_if('L' as u8) {
+            self.demangle_decl_name()?;
+        }
+
+        if let Some(true) = self.next_if('l' as u8) {
+            let discriminator = self.pop_node_of_kind(Kind::Identifier)?;
+            return Ok(self.cache.create_node_with_child(Kind::PrivateDeclName, discriminator))
+        }
+
+        if let Some(c) = self.peek_char() {
+            if let 'a'..='j' | 'A'..='J' = c as char {
+                let related_entity_kind = self.next_char().unwrap();
+                let mut text = String::new();
+                text.push(related_entity_kind as char);
+                let kind_node = self.cache.create_text_node(Kind::Identifier, text);
+                let name = self.pop_node()?;
+                return Ok(self.cache.create_node_with_children(Kind::RelatedEntityDeclName, vec![kind_node, name]))
+            }
+        }
+
+        Ok(self.demangle_decl_name()?)
+    }
+
     pub fn demangle_operator(&mut self) -> Result<Rc<Node>, Error> {
-        let mut c = self.next_char_skip_padding();
+        let c = self.next_char_skip_padding();
         if let Some(c) = c {
             match c as char {
                 '\x01'..='\x0C' => unimplemented!("Symbolic references are not implemented."),
@@ -794,7 +831,7 @@ impl Demangler<'_> {
                 'H' => unimplemented!("H operator is not supported"),
                 'I' => unimplemented!("demangleImplFunctionType() is not implemented."),
                 'K' => Ok(self.cache.create_none_node(Kind::ThrowsAnnotation)),
-                'L' => unimplemented!("demangleLocalIdentifier() is not implemented."),
+                'L' => self.demangle_local_identifier(),
                 'M' => unimplemented!("demangleMetatype() is not implemented."),
                 'N' => {
                     let node = self.pop_node()?;
