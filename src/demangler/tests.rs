@@ -300,3 +300,23 @@ fn test_demangle_standard_substitution_known_type() {
 
     assert_eq!(node, dem.cache.create_swift_type(Kind::Structure, "UInt".to_string()))
 }
+
+#[test]
+fn test_demangle_any_generic_type() {
+    let mut dem = make_demangler(b"");
+
+
+    let node = Rc::new(Node::new(Kind::Identifier, Payload::None));
+    dem.push_node(node);
+
+    let ctx = Rc::new(Node::new(Kind::PostfixOperator, Payload::None));
+    dem.push_node(ctx);
+
+    let gen = dem.demangle_any_generic_type(Kind::DefaultAssociatedConformanceAccessor).or_else(|err| {
+        println!("{}", err.message());
+        Err(err)
+    }).unwrap();
+
+    println!("num children {}", gen.num_children());
+    gen.get_child(0).unwrap().print();
+}
