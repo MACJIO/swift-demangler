@@ -124,6 +124,16 @@ impl Node {
         }
     }
 
+    pub fn get_child_if(&mut self, kind: Kind) -> Option<(Rc<Node>, usize)> {
+        for i in 0..self.num_children() {
+            let child = self.get_child(i).unwrap();
+            if child.kind == kind {
+                return Some((child, i))
+            }
+        }
+        None
+    }
+
     pub fn iter_children(&self) -> NodeIterator {
         NodeIterator {
             inner_iter: match &self.payload {
