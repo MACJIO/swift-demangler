@@ -1,6 +1,8 @@
 use std::slice::Iter;
 use std::rc::Rc;
 
+use crate::error::{Error, ErrorKind};
+
 pub mod kind;
 pub use kind::Kind;
 
@@ -106,6 +108,19 @@ impl Node {
             v.get(i).and_then(|r| Some(r.clone()))
         } else {
             None
+        }
+    }
+
+    /// Returns a reference to a child node at a given index or Error in case node ether has no
+    /// children or the index is OOB.
+    pub fn get_child_or_err(&self, i: usize) -> Result<Rc<Node>, Error> {
+        if let Some(child) = self.get_child(i) {
+            Ok(child)
+        } else {
+            Err(Error::new(
+                ErrorKind::MissingChildNode,
+                format!("Expected child node")
+            ))
         }
     }
 
