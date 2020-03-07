@@ -88,6 +88,33 @@ fn create_standard_substitution(cache: &mut NodeCache, c: char) -> Option<Rc<Nod
     Some(node)
 }
 
+pub enum ValueWitnessKind {
+    AllocateBuffer = 0,
+    AssignWithCopy,
+    AssignWithTake,
+    DeallocateBuffer,
+    Destroy,
+    DestroyBuffer,
+    DestroyArray,
+    InitializeBufferWithCopyOfBuffer,
+    InitializeBufferWithCopy,
+    InitializeWithCopy,
+    InitializeBufferWithTake,
+    InitializeWithTake,
+    ProjectBuffer,
+    InitializeBufferWithTakeOfBuffer,
+    InitializeArrayWithCopy,
+    InitializeArrayWithTakeFrontToBack,
+    InitializeArrayWithTakeBackToFront,
+    StoreExtraInhabitant,
+    GetExtraInhabitantIndex,
+    GetEnumTag,
+    DestructiveProjectEnumData,
+    DestructiveInjectEnumTag,
+    GetEnumTagSinglePayload,
+    StoreEnumTagSinglePayload,
+}
+
 pub struct Demangler<'a> {
     buffer: &'a [u8],
     position: usize,
@@ -131,6 +158,17 @@ impl Demangler<'_> {
         let position = self.position;
         if position < buffer.len() {
             Some(buffer[position])
+        } else {
+            None
+        }
+    }
+
+    pub fn next_bytes(&mut self, len: usize) -> Option<&[u8]> {
+        let position = self.position;
+        let bytes_avail = self.buffer.len() - self.position;
+        if bytes_avail >= len {
+            self.position = position + len;
+            Some(&self.buffer[position..self.position])
         } else {
             None
         }
@@ -810,6 +848,132 @@ impl Demangler<'_> {
         Ok(self.cache.create_type_node(node))
     }
 
+    pub fn demangle_decl_name(&mut self) -> Result<Rc<Node>, Error> {
+        let discriminator = self.demangle_index_as_node()?;
+        let name = self.pop_node()?;
+        if kind::is_decl_name(name.kind()) {
+            Ok(self.cache.create_node_with_children(Kind::PrivateDeclName, vec![discriminator, name]))
+        } else {
+            Err(Error::new(
+                ErrorKind::UnexpectedNodeKind,
+                "Expected decl kind.".to_string()
+            ))
+        }
+    }
+
+    pub fn demangle_local_identifier(&mut self) -> Result<Rc<Node>, Error> {
+        if let Some(true) = self.next_if('L' as u8) {
+            self.demangle_decl_name()?;
+        }
+
+        if let Some(true) = self.next_if('l' as u8) {
+            let discriminator = self.pop_node_of_kind(Kind::Identifier)?;
+            return Ok(self.cache.create_node_with_child(Kind::PrivateDeclName, discriminator))
+        }
+
+        if let Some(c) = self.peek_char() {
+            if let 'a'..='j' | 'A'..='J' = c as char {
+                let related_entity_kind = self.next_char().unwrap();
+                let mut text = String::new();
+                text.push(related_entity_kind as char);
+                let kind_node = self.cache.create_text_node(Kind::Identifier, text);
+                let name = self.pop_node()?;
+                return Ok(self.cache.create_node_with_children(Kind::RelatedEntityDeclName, vec![kind_node, name]))
+            }
+        }
+
+        Ok(self.demangle_decl_name()?)
+    }
+
+    pub fn demangle_value_witness(&mut self) -> Result<Rc<Node>, Error> {
+        if let Some(name) = self.next_bytes(2) {
+            let kind = match name {
+                b"al" => ValueWitnessKind::AllocateBuffer,
+                b"ca" => ValueWitnessKind::AssignWithCopy,
+                b"ta" => ValueWitnessKind::AssignWithTake,
+                b"de" => ValueWitnessKind::DeallocateBuffer,
+                b"xx" => ValueWitnessKind::Destroy,
+                b"XX" => ValueWitnessKind::DestroyBuffer,
+                b"Xx" => ValueWitnessKind::DestroyArray,
+                b"CP" => ValueWitnessKind::InitializeBufferWithCopyOfBuffer,
+                b"Cp" => ValueWitnessKind::InitializeBufferWithCopy,
+                b"cp" => ValueWitnessKind::InitializeWithCopy,
+                b"Tk" => ValueWitnessKind::InitializeBufferWithTake,
+                b"tk" => ValueWitnessKind::InitializeWithTake,
+                b"pr" => ValueWitnessKind::ProjectBuffer,
+                b"TK" => ValueWitnessKind::InitializeBufferWithTakeOfBuffer,
+                b"Cc" => ValueWitnessKind::InitializeArrayWithCopy,
+                b"Tt" => ValueWitnessKind::InitializeArrayWithTakeFrontToBack,
+                b"tT" => ValueWitnessKind::InitializeArrayWithTakeBackToFront,
+                b"xs" => ValueWitnessKind::StoreExtraInhabitant,
+                b"xg" => ValueWitnessKind::GetExtraInhabitantIndex,
+                b"ug" => ValueWitnessKind::GetEnumTag,
+                b"up" => ValueWitnessKind::DestructiveProjectEnumData,
+                b"ui" => ValueWitnessKind::DestructiveInjectEnumTag,
+                b"et" => ValueWitnessKind::GetEnumTagSinglePayload,
+                b"st" => ValueWitnessKind::StoreEnumTagSinglePayload,
+                _ => return Err(Error::new(
+                    ErrorKind::UnexpectedCharacter,
+                    format!("Expected witness name at position {}.", self.position)
+                ))
+            };
+            let idx_node = self.cache.create_index_node(Kind::Index, kind as u64);
+            let ty = self.pop_node_of_kind(Kind::Type)?;
+            Ok(self.cache.create_node_with_children(Kind::ValueWitness, vec![
+                idx_node, ty
+            ]))
+        } else {
+            Err(Error::new(
+                ErrorKind::UnexpectedEndOfName,
+                format!("Expected to characters at position {}.", self.position)
+            ))
+        }
+    }
+
+    pub fn pop_function_param_labels(&mut self, type_node: Rc<Node>) -> Result<Rc<Node>, Error> {
+        // TODO: Make is_old_function_type_mangling method
+        // we need to check if mangled name starts with _T
+        self.pop_node_of_kind(Kind::EmptyList).and_then(|_| {
+            return Ok(self.cache.create_none_node(Kind::EmptyList))
+        })?;
+
+        if type_node.kind() != Kind::Type {
+            return Err(Error::new(
+                ErrorKind::UnexpectedNodeKind,
+                "Expected type node".to_string()
+            ))
+        }
+
+        let mut func_type = type_node.get_child_or_err(0)?;
+        if func_type.kind() == Kind::DependentGenericType {
+            func_type = func_type.get_child_or_err(1)?.get_child_or_err(0)?;
+        }
+
+        // Here is an unreachable condition in original demangler
+        if func_type.kind() != Kind::FunctionType && func_type.kind() != Kind::NoEscapeFunctionType {
+            unreachable!()
+        }
+
+        let mut param_type = func_type.get_child_or_err(0)?;
+        if param_type.kind() == Kind::ThrowsAnnotation {
+            param_type = func_type.get_child_or_err(1)?;
+        }
+
+        let params_type = param_type.get_child_or_err(0)?;
+        let params = params_type.get_child_or_err(0)?;
+        let num_params = if params.kind() == Kind::Tuple {
+            params.num_children()
+        } else {
+            1
+        };
+
+        if num_params == 0 {
+            unimplemented!("return error");
+        }
+
+        Err(unimplemented!())
+    }
+
     pub fn demangle_operator(&mut self) -> Result<Rc<Node>, Error> {
         if let Some(c) = self.next_char_skip_padding() {
             match c as char {
@@ -824,7 +988,7 @@ impl Demangler<'_> {
                 'H' => unimplemented!("H operator is not supported"),
                 'I' => unimplemented!("demangleImplFunctionType() is not implemented."),
                 'K' => Ok(self.cache.create_none_node(Kind::ThrowsAnnotation)),
-                'L' => unimplemented!("demangleLocalIdentifier() is not implemented."),
+                'L' => self.demangle_local_identifier(),
                 'M' => unimplemented!("demangleMetatype() is not implemented."),
                 'N' => {
                     let node = self.pop_node()?;
@@ -880,7 +1044,7 @@ impl Demangler<'_> {
                 't' => unimplemented!("popTuple() is not implemented."),
                 'u' => unimplemented!("demangleGenericType() is not implemented."),
                 'v' => unimplemented!("demangleVariable() is not implemented."),
-                'w' => unimplemented!("demangleValueWitness() is not implemented."),
+                'w' => self.demangle_value_witness(),
                 'x' => unimplemented!("createType(getDependentGenericParamType(0, 0)) is not implemented."),
                 'y' => Ok(self.cache.create_none_node(Kind::EmptyList)),
                 'z' => {
