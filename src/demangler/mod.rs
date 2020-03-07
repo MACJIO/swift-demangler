@@ -899,6 +899,50 @@ impl Demangler<'_> {
         }
     }
 
+    pub fn pop_function_param_labels(&mut self, type_node: Rc<Node>) -> Result<Rc<Node>, Error> {
+        // TODO: Make is_old_function_type_mangling method
+        // we need to check if mangled name starts with _T
+        self.pop_node_of_kind(Kind::EmptyList).and_then(|_| {
+            return Ok(self.cache.create_none_node(Kind::EmptyList))
+        })?;
+
+        if type_node.kind() != Kind::Type {
+            return Err(Error::new(
+                ErrorKind::UnexpectedNodeKind,
+                "Expected type node".to_string()
+            ))
+        }
+
+        let mut func_type = type_node.get_child_or_err(0)?;
+        if func_type.kind() == Kind::DependentGenericType {
+            func_type = func_type.get_child_or_err(1)?.get_child_or_err(0)?;
+        }
+
+        // Here is an unreachable condition in original demangler
+        if func_type.kind() != Kind::FunctionType && func_type.kind() != Kind::NoEscapeFunctionType {
+            unreachable!()
+        }
+
+        let mut param_type = func_type.get_child_or_err(0)?;
+        if param_type.kind() == Kind::ThrowsAnnotation {
+            param_type = func_type.get_child_or_err(1)?;
+        }
+
+        let params_type = param_type.get_child_or_err(0)?;
+        let params = params_type.get_child_or_err(0)?;
+        let num_params = if params.kind() == Kind::Tuple {
+            params.num_children()
+        } else {
+            1
+        };
+
+        if num_params == 0 {
+            unimplemented!("return error");
+        }
+
+        Err(unimplemented!())
+    }
+
     pub fn demangle_operator(&mut self) -> Result<Rc<Node>, Error> {
         if let Some(c) = self.next_char_skip_padding() {
             match c as char {
@@ -969,7 +1013,7 @@ impl Demangler<'_> {
                 't' => unimplemented!("popTuple() is not implemented."),
                 'u' => unimplemented!("demangleGenericType() is not implemented."),
                 'v' => unimplemented!("demangleVariable() is not implemented."),
-                'w' => unimplemented!("demangleValueWitness() is not implemented."),
+                'w' => self.demangle_value_witness(),
                 'x' => unimplemented!("createType(getDependentGenericParamType(0, 0)) is not implemented."),
                 'y' => Ok(self.cache.create_none_node(Kind::EmptyList)),
                 'z' => {
