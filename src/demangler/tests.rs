@@ -326,7 +326,7 @@ fn test_demangle_operator_objc_class_name() {
     let mut dem = Demangler::new(b"So28DZRDynamicPageViewControllerC", 0);
     dem.parse_and_push_nodes().or_else(|e| -> Result<(), Error> {
         panic!("{:?}", e)
-    });
+    }).unwrap();
     let mut idx = 0;
     while let Ok(node) = dem.pop_node() {
         println!("#{} {:?}", idx, node);
@@ -339,7 +339,7 @@ fn test_demangle_operator_objc_proto_name() {
     let mut dem = Demangler::new(b"s25ExpressibleByArrayLiteralP.1337", 0);
     dem.parse_and_push_nodes().or_else(|e| -> Result<(), Error> {
         panic!("{:?}", e)
-    });
+    }).unwrap();
     let mut idx = 0;
     while let Ok(node) = dem.pop_node() {
         println!("#{} {:?}", idx, node);

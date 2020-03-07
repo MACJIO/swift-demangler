@@ -284,6 +284,37 @@ impl Demangler<'_> {
         })
     }
 
+    pub fn pop_function_params(&mut self, kind: Kind) -> Result<Rc<Node>, Error> {
+        let node = self.pop_node()?;
+
+        let ty = match node.kind() {
+            Kind::EmptyList => {
+                let tuple = self.cache.create_none_node(Kind::Tuple);
+                self.cache.create_type_node(tuple)
+            },
+            Kind::Type => node,
+            _ => {
+                self.push_node(node);
+                return Err(Error::new(
+                    ErrorKind::UnexpectedNodeKind,
+                    "Unexpected function params node kind.".to_string()
+                ));
+            }
+        };
+
+        Ok(self.cache.create_node_with_child(kind, ty))
+    }
+
+    pub fn pop_function_type(&mut self, kind: Kind) -> Result<Rc<Node>, Error> {
+        let annotation = self.pop_node_of_kind(Kind::ThrowsAnnotation)?;
+        let args = self.pop_function_params(Kind::ArgumentTuple)?;
+        let ret_type = self.pop_function_params(Kind::ReturnType)?;
+        Ok(self.cache.create_node_with_children(
+            kind,
+            vec![annotation, args, ret_type]
+        ))
+    }
+
     pub fn char_or_err(&self, c: Option<u8>) -> Result<u8, Error> {
         if let Some(c) = c {
             Ok(c)
@@ -820,7 +851,7 @@ impl Demangler<'_> {
                     }
                 },
                 'a' => self.demangle_any_generic_type(Kind::TypeAlias),
-                'c' => unimplemented!("popFunctionType() is not implemented."),
+                'c' => self.pop_function_type(Kind::FunctionType),
                 'd' => Ok(self.cache.create_none_node(Kind::VariadicMarker)),
                 'f' => unimplemented!("demangleFunctionEntity() is not implemented."),
                 'g' => unimplemented!("demangleRetroactiveConformance() is not implemented."),
