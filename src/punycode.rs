@@ -8,6 +8,7 @@
     unused_import_braces,
     unused_qualifications,
 )]
+#![allow(dead_code)] // TODO: remove when implementing encoder
 
 #![cfg_attr(feature = "dev", feature(plugin))]
 #![cfg_attr(feature = "dev", plugin(clippy))]
